@@ -39,9 +39,11 @@ Settings).
 | --- | --- | --- | --- |
 | Iron Horses | Steam | $5 | free |
 | Diesel Dynasty | Diesel | $25 | $400 |
-| Electric Avenue | Electric | $120 | $2,500 |
-| Bullet Dreams | High-speed | $600 | $15,000 |
-| Maglev Futures | Maglev & future | $3,000 | $80,000 |
+| Electric Avenue | Electric | $120 | $2,000 |
+| Bullet Dreams | High-speed | $600 | $10,000 |
+| Maglev Futures | Maglev & future | $3,000 | $50,000 |
+
+Higher tiers return a little more (value boost ×1.00 / 1.04 / 1.08 / 1.12 / 1.16).
 
 Booster box = 12 packs at 8% off.
 
@@ -56,6 +58,7 @@ famous concept), with a fact on the back.
 - Slot 5 (hit): Rare 73.75%, Super Rare 22%, Ultra Rare 3.5%, Secret 0.75%.
 - **Pity:** an Ultra Rare or better is guaranteed within 40 packs of a set.
 - **God pack:** 1 in 500 packs, every card is SR or better.
+- A pack never contains two copies of the same card.
 - **First session:** your third pack ever has a guaranteed Super Rare.
 - **1st Edition print run:** the first 30 packs you open of each set are
   1st Edition (shown on a counter in the Shop). Cards in them carry a 1st
@@ -66,10 +69,12 @@ famous concept), with a fact on the back.
 | Variety | Chance | Value |
 | --- | --- | --- |
 | Standard | rest | ×1 |
-| Holo | 12% | ×2 |
+| Holo | 8% | ×2.5 |
 | Full Art | 15% of SR+ | ×3 |
 | Gold | 0.6% | ×10 |
 | Misprint | 0.2% | ×15 |
+
+Gold and Misprint cards have a base value floor of 20% of the pack price, so even a Gold common is a real hit.
 
 ## Value
 
@@ -108,8 +113,10 @@ about ×1.3 minus fees.
 - **Bulk:** sell all Standard commons and uncommons in one tap at dealer rate.
 - **Singles:** the market stocks a few cards per set at 105% of value (stock
   rotates every few minutes). Useful for completing sets and filling requests.
-- **Sealed:** packs and boxes resell at 85% of current shop price. Shop price =
-  base × hype, so you profit when buying in a dip and selling in a boom.
+- **Sealed:** packs resell at 75% of the pack price × the lower of current and
+  10-minute average hype, minus sealed demand pressure (3% per pack sold,
+  recovering each tick). Always below the cheapest box price, so there's no
+  instant arbitrage; profit only comes from buying in a real dip.
 
 ## Other income
 
@@ -121,13 +128,14 @@ about ×1.3 minus fees.
   ($20 / $100 / $500 / $2,500 / $12,000 per hour). Offline earnings are capped at 2 h.
 - **Set bounties:** owning all 24 base cards of a set pays 3 × pack price × 24
   once.
-- **Free pack:** one Iron Horses pack every 15 min, stockpiling up to 3.
+- **Free pack:** one pack of your newest licensed set every 20 min, stockpiling up to 3.
   "On the house" starter pack whenever cash plus assets is under $5.
 - **Achievements** pay small cash rewards.
 
 ## Market events
 
-One at a time, announced 60 s ahead, lasting 3–5 min:
+One at a time, announced 60 s ahead, lasting 3–5 min. The first event comes at
+8 min, and there are no crashes in a player's first 20 minutes:
 - Set boom or crash (hype ±30–50%)
 - Holo Craze (Holo variety ×1.5)
 - Grading Rush (grading fees halved)
@@ -144,6 +152,11 @@ commons after each rip).
 
 Cash + dealer value of cards + resale value of sealed product. Valuing at
 dealer price prevents fake wealth from price spikes.
+
+## Pack summaries
+
+Packs remember what you paid (cost basis per set), so a free pack shows as pure
+profit and a box shows its real discount.
 
 ## Tech
 
