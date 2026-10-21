@@ -204,7 +204,7 @@ function SingleOpening() {
 
       {phase === 'tear' && (
         <div
-          className={'tear-zone' + (torn ? ' torn' : '')}
+          className={'tear-zone' + (torn ? ' torn' : '') + (result.god ? ' god' : '')}
           onPointerDown={(e) => { swipe.current = { x: e.clientX, max: 0 }; }}
           onPointerMove={(e) => {
             if (!swipe.current) return;
@@ -219,7 +219,7 @@ function SingleOpening() {
             <PackArt set={result.set} size="lg" />
             <div className="tear-strip" />
           </div>
-          {!torn && <div className="hint pulse">Swipe across or tap to tear open</div>}
+          {!torn && <div className="hint pulse">{result.god ? 'This pack feels… heavy. Tear it open!' : 'Swipe across or tap to tear open'}</div>}
         </div>
       )}
 
@@ -270,7 +270,7 @@ function SingleOpening() {
               </div>
             ) : (
               <div className="hint">
-                {result.fakeFrom && isHit && !cracked ? 'Something feels different… tap'
+                {result.fakeFrom && isHit && !cracked ? 'Ooh, it’s glowing… tap to flip'
                   : needsHold ? 'Press and hold to reveal!'
                   : glowRarity ? 'Ooh, it’s glowing… tap to flip'
                   : 'Tap to flip'}
@@ -290,7 +290,7 @@ function SingleOpening() {
   );
 }
 
-function Burst({ rarity }: { rarity: Rarity }) {
+export function Burst({ rarity }: { rarity: Rarity }) {
   const n = { C: 0, U: 8, R: 16, SR: 28, UR: 48, SEC: 70 }[rarity];
   const parts = useMemo(() => Array.from({ length: n }, (_, i) => ({
     a: (i / n) * 360 + Math.random() * 20,
@@ -327,10 +327,48 @@ function QuickSummary() {
   const bigHit = hits.find((h) => RANK[CARD_BY_ID[h.inst.cardId].rarity] >= 4);
   const gods = opening.results.filter((r) => r.god).length;
   const autoSold = opening.results.reduce((a, r) => a + r.autoSoldTotal, 0);
+  const showcase = hits.filter((h) => RANK[CARD_BY_ID[h.inst.cardId].rarity] >= 4 || h.inst.variety === 'gold' || h.inst.variety === 'misprint').slice(0, 8);
+  const [step, setStep] = useState(0);
+  const inShowcase = step < showcase.length;
   useEffect(() => {
-    if (bigHit) { sfx.reveal(CARD_BY_ID[bigHit.inst.cardId].rarity); buzz([60, 40, 90]); } else sfx.reveal('R');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (inShowcase) {
+      const h = showcase[step];
+      const r = CARD_BY_ID[h.inst.cardId].rarity;
+      sfx.reveal(RANK[r] >= 4 ? r : 'UR');
+      buzz([60, 40, 90]);
+    } else if (!showcase.length) sfx.reveal(bigHit ? CARD_BY_ID[bigHit.inst.cardId].rarity : 'R');
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = SET_BY_ID[opening.set];
+  if (inShowcase) {
+    const h = showcase[step];
+    const def = CARD_BY_ID[h.inst.cardId];
+    return (
+      <div className="opening" style={{ '--s1': set.color, '--s2': set.color2 } as CSSProperties} onClick={() => setStep(step + 1)}>
+        <div className="opening-bg" />
+        <Burst rarity={RANK[def.rarity] >= 4 ? def.rarity : 'UR'} key={step} />
+        <div className="opening-top">
+          <span className="muted">Big hit {step + 1} of {showcase.length}</span>
+          <button className="btn tiny ghost" onClick={(e) => { e.stopPropagation(); setStep(showcase.length); }}>Skip ›</button>
+        </div>
+        <div className="reveal-zone">
+          <div className="card-stage showcase" key={step}><Tilt><CardFace look={h.inst} size="lg" /></Tilt></div>
+          <div className="reveal-info">
+            <div className="reveal-text pop">
+              <div className="rv-name">{def.name}</div>
+              <div className="rv-tags">
+                <span className="tag" style={{ color: RARITY_COLOR[def.rarity] }}>{RARITY_NAME[def.rarity]}</span>
+                {h.inst.variety !== 'std' && <span className="tag shiny">{VARIETY_NAME[h.inst.variety]}</span>}
+                {h.inst.first && <span className="tag first">1st Edition</span>}
+                {h.isNew && <span className="tag new">NEW</span>}
+              </div>
+              <CountUp value={h.value} className="rv-value" duration={1400} />
+            </div>
+          </div>
+          <div className="hint">Tap to continue</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="opening summary-phase" style={{ '--s1': set.color, '--s2': set.color2 } as CSSProperties}>
       {bigHit && <Burst rarity={CARD_BY_ID[bigHit.inst.cardId].rarity} />}

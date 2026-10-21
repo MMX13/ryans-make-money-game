@@ -4,6 +4,7 @@ import * as G from '../../engine/game';
 import { PackArt } from '../Card';
 import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
+import { useState } from 'react';
 import { Money, Sparkline, TrendArrow, fmtTime, useNow } from '../widgets';
 
 export function Shop() {
@@ -14,14 +15,21 @@ export function Shop() {
   const now = useNow(1000);
   const nextLicense = SETS.find((s) => !game.licenses.includes(s.id));
   const freeSet = G.freePackSet(game);
+  const [confirmSell, setConfirmSell] = useState<string | null>(null);
+  const sale = G.eventActive(game, 'sale');
 
   const buy = (set: SetId, n: number, box = false) => {
-    const ok = act((g) => G.buyPacks(g, set, n, box));
+    const ok = act((g) => {
+      const done = G.buyPacks(g, set, n, box);
+      if (done) G.notify(g, 'info', `+${box ? 12 : n} pack${(box ? 12 : n) > 1 ? 's' : ''} ready to rip`);
+      return done;
+    });
     if (ok) { sfx.coin(); buzz(10); } else { sfx.error(); buzz([10, 40, 10]); }
   };
 
   return (
     <div className="screen shop">
+      {sale && <div className="banner pos">Dealer Sale on now: booster boxes are 20% off!</div>}
       <div className="free-card">
         <div>
           <b>Free pack</b>
@@ -95,14 +103,18 @@ export function Shop() {
                 <button className="btn" disabled={!canBuy(1)} onClick={() => buy(set.id, 1)}>×1</button>
                 <button className="btn" disabled={!canBuy(5)} onClick={() => buy(set.id, 5)}>×5</button>
                 <button className="btn primary" disabled={game.cash < box} onClick={() => buy(set.id, BOX_SIZE, true)}>
-                  Box ×{BOX_SIZE} <small><Money v={box} compact /></small>
+                  Box ×{BOX_SIZE} <small>{sale && <s className="was"><Money v={price * BOX_SIZE * 0.92} compact /></s>} <Money v={box} compact /></small>
                 </button>
               </div>
               {game.packs[set.id] > 0 && (
                 <div className="owned-line">
                   <button className="link" onClick={() => setTab('rip')}>{game.packs[set.id]} unopened ›</button>
-                  <button className="link muted" onClick={() => { const got = act((g) => G.sellSealed(g, set.id, 1)); if (got) sfx.coin(); }}>
-                    Sell sealed <Money v={G.sealedResale(game, set.id)} />
+                  <button className={'link sell-sealed' + (confirmSell === set.id ? ' confirm' : ' muted')} onClick={() => {
+                    if (confirmSell !== set.id) { setConfirmSell(set.id); setTimeout(() => setConfirmSell((c) => (c === set.id ? null : c)), 3000); return; }
+                    setConfirmSell(null);
+                    const got = act((g) => G.sellSealed(g, set.id, 1)); if (got) sfx.coin();
+                  }}>
+                    {confirmSell === set.id ? 'Tap again to sell' : 'Sell 1 sealed'} <Money v={G.sealedResale(game, set.id)} />
                   </button>
                 </div>
               )}
@@ -110,7 +122,10 @@ export function Shop() {
           </div>
         );
       })}
-      {G.eventActive(game, 'sale') && <div className="banner pos">Dealer Sale on now: booster boxes are 20% off!</div>}
+      <div className="shortcuts">
+        <button className="shortcut" onClick={() => push({ kind: 'upgrades' })}><b>Upgrades</b><small className="muted">Better prices, more slots</small></button>
+        <button className="shortcut" onClick={() => push({ kind: 'display' })}><b>Display Case</b><small className="muted">Earn while you're away</small></button>
+      </div>
     </div>
   );
 }

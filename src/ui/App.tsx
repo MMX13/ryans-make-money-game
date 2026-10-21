@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MILESTONES } from '../engine/config';
 import { SETS } from '../engine/data';
 import * as G from '../engine/game';
-import { PackOpening } from './PackOpening';
+import { Burst, PackOpening } from './PackOpening';
 import { Binder } from './screens/Binder';
 import { Grading } from './screens/Grading';
 import { Market } from './screens/Market';
@@ -72,7 +72,7 @@ function Header() {
     <header className="header">
       <div className="hdr-cash">
         <small>Cash</small>
-        <b><Rolling value={cash} /></b>
+        <b><Rolling value={cash} compact={cash >= 1e5} /></b>
       </div>
       <div className="hdr-nw">
         <small>Net worth {next ? <span className="muted">→ {G.fmtMoney(next, true)}</span> : '· Rail Baron'}</small>
@@ -116,6 +116,8 @@ function Toasts() {
   const opening = useStore((s) => s.opening || s.revealing);
   const seen = useRef(new Set<number>());
   const [visible, setVisible] = useState<G.Notice[]>([]);
+  const [celeb, setCeleb] = useState<string | null>(null);
+  useEffect(() => { if (!celeb) return; const t = setTimeout(() => setCeleb(null), 2600); return () => clearTimeout(t); }, [celeb]);
   useEffect(() => {
     for (const n of notices) {
       if (seen.current.has(n.id)) continue;
@@ -126,12 +128,20 @@ function Toasts() {
       if (n.kind === 'achievement') sfx.bigCoin();
       if (n.kind === 'milestone') { sfx.fanfare(); buzz([50, 50, 100]); }
       if (n.kind === 'milestone' && n.text.startsWith('RAIL BARON')) setTimeout(() => useStore.getState().push({ kind: 'victory' }), 600);
+      else if (n.kind === 'milestone' && n.text.startsWith('Net worth')) setCeleb(n.text);
       const ttl = n.kind === 'milestone' ? 5000 : 3200;
       setTimeout(() => setVisible((v) => v.filter((x) => x.id !== n.id)), ttl);
     }
     if (notices.some((x) => seen.current.has(x.id))) act((g) => { g.notices = g.notices.filter((x) => !seen.current.has(x.id)); });
   }, [notices, opening]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
+    <>
+    {celeb && (
+      <div className="celebrate" onClick={() => setCeleb(null)}>
+        <Burst rarity="UR" />
+        <div className="celebrate-text"><small>Milestone</small><b>{celeb.replace('Net worth passed ', '')}</b><span>net worth</span></div>
+      </div>
+    )}
     <div className={'toasts' + (opening ? ' over' : '')}>
       {visible.map((n) => (
         <div key={n.id} className={'toast t-' + n.kind}>
@@ -140,6 +150,7 @@ function Toasts() {
         </div>
       ))}
     </div>
+    </>
   );
 }
 

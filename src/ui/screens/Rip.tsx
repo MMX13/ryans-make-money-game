@@ -1,6 +1,6 @@
 import { SETS, type SetId } from '../../engine/data';
 import * as G from '../../engine/game';
-import { PackArt } from '../Card';
+import { CardFace, PackArt } from '../Card';
 import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
 import { Empty, Money } from '../widgets';
@@ -11,6 +11,23 @@ export function Rip() {
   const setOpening = useStore((s) => s.setOpening);
   const setTab = useStore((s) => s.setTab);
   const owned = SETS.filter((s) => game.packs[s.id] > 0);
+  const push = useStore((s) => s.push);
+  const recent = game.cards
+    .filter((c) => c.variety !== 'std' || ['R', 'SR', 'UR', 'SEC'].includes(G.card(c).rarity))
+    .slice(-60).sort((a, b) => b.uid - a.uid).slice(0, 8);
+  const recentStrip = recent.length > 0 && (
+    <>
+      <h4 className="section">Recent hits</h4>
+      <div className="recent-strip">
+        {recent.map((c) => (
+          <button key={c.uid} className="plain" onClick={() => push({ kind: 'card', uid: c.uid })}>
+            <CardFace look={c} size="sm" />
+            <Money v={G.value(game, c)} />
+          </button>
+        ))}
+      </div>
+    </>
+  );
 
   const open = (set: SetId) => {
     const res = act((g) => G.openPack(g, set));
@@ -30,6 +47,7 @@ export function Rip() {
       <div className="screen rip">
         <Empty icon="📦" title="No packs to open">Buy packs in the Shop, or claim your free pack.</Empty>
         <button className="btn primary wide" onClick={() => setTab('shop')}>Go to Shop</button>
+        {recentStrip}
       </div>
     );
   }
@@ -56,6 +74,7 @@ export function Rip() {
           </div>
         );
       })}
+      {recentStrip}
     </div>
   );
 }

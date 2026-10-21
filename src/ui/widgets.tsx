@@ -129,5 +129,6 @@ export function Icon({ name, size = 24 }: { name: keyof typeof ICONS | string; s
 export function TrendArrow({ v }: { v: number }) {
   const pct = (v - 1) * 100;
   const cls = pct > 1 ? 'pos' : pct < -1 ? 'neg' : 'flat';
-  return <span className={'trend ' + cls}>{pct > 1 ? '▲' : pct < -1 ? '▼' : '■'} {Math.abs(pct).toFixed(0)}%</span>;
+  if (cls === 'flat') return <span className="trend flat">steady</span>;
+  return <span className={'trend ' + cls}>{pct > 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(0)}%</span>;
 }

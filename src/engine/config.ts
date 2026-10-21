@@ -96,7 +96,7 @@ export const FREE_PACK_MAX = 3;
 export const OFFLINE_CAP_MS = 2 * 3600_000;
 
 export const DISPLAY_PCT_PER_HOUR = 0.06;
-export const DISPLAY_CAP_BY_SET: Record<SetId, number> = { iron: 20, diesel: 100, electric: 500, bullet: 2500, maglev: 12000 };
+export const DISPLAY_CAP_BY_SET: Record<SetId, number> = { iron: 20, diesel: 100, electric: 500, bullet: 1500, maglev: 5000 };
 
 export const REQUEST_COUNT = 3;
 export const REQUEST_ROTATE_MS = 6 * 60_000;
@@ -109,7 +109,7 @@ export const UPGRADES: Record<UpgradeId, { name: string; desc: (lvl: number) => 
   display: { name: 'Display Case', icon: '🖼️', desc: (l) => `${2 + l} display slots`, costs: [200, 1200, 6000, 25000, 60000, 120000] },
   loupe: { name: 'Jeweler\'s Loupe', icon: '🔍', desc: (l) => ['Rough condition estimates', 'Better condition estimates', 'Sharp condition estimates', 'Near-perfect condition estimates'][l], costs: [300, 4000, 40000] },
   gradeSlots: { name: 'Grading Slots', icon: '📦', desc: (l) => `${2 + l} cards at the grader at once`, costs: [250, 2000, 12000, 60000] },
-  autoBulk: { name: 'Auto-Bulk', icon: '🧹', desc: (l) => (l ? 'Standard commons are sold automatically after each rip' : 'Automatically sell Standard commons after each rip'), costs: [500] },
+  autoBulk: { name: 'Auto-Bulk', icon: '🧹', desc: (l) => (l ? 'On: duplicate Standard commons are sold as you rip' : 'Sells duplicate Standard commons and uncommons as you rip (always keeps one of each)'), costs: [500] },
 };
 export const LOUPE_SIGMA = [0.9, 0.6, 0.35, 0.15];
 

@@ -9,6 +9,7 @@ import { Empty, Icon, Money, Sheet } from '../widgets';
 
 export function MenuSheet() {
   const push = useStore((s) => s.push);
+  const pop = useStore((s) => s.pop);
   const game = useStore((s) => s.game);
   const items: [string, string, string, () => void][] = [
     ['upgrades', 'Upgrades', 'Better prices, more slots', () => push({ kind: 'upgrades' })],
@@ -22,7 +23,7 @@ export function MenuSheet() {
     <Sheet title="Menu">
       <div className="menu-list">
         {items.map(([icon, title, sub, fn]) => (
-          <button key={title} className="menu-item" onClick={() => { sfx.click(); fn(); }}>
+          <button key={title} className="menu-item" onClick={() => { sfx.click(); pop(); fn(); }}>
             <span className="menu-icon"><Icon name={icon} /></span>
             <span className="grow"><b>{title}</b><small className="muted">{sub}</small></span>
             <span className="muted">›</span>
