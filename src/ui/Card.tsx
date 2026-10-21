@@ -6,8 +6,20 @@ import { GRADERS, RARITY_NAME, type GraderId, type Variety } from '../engine/con
 export const RARITY_SYMBOL: Record<Rarity, string> = { C: '●', U: '◆', R: '★', SR: '★★', UR: '★★★', SEC: '✦' };
 export const RARITY_COLOR: Record<Rarity, string> = { C: '#a7adb5', U: '#4fc98a', R: '#4aa3ff', SR: '#b56cff', UR: '#ffc93c', SEC: '#ff5fd2' };
 
+const TIER: Record<Rarity, number> = { C: 0, U: 1, R: 2, SR: 3, UR: 4, SEC: 5 };
+
+/** Art description for a card definition. */
+export function artSpec(def: CardDef) {
+  return {
+    loco: def.loco, scene: def.scene, body: def.body, accent: def.accent, sky: def.sky,
+    seed: hashSeed(def.id), number: cardNumber(def), tier: TIER[def.rarity],
+    livery: def.name.includes('Warbonnet') ? ('warbonnet' as const) : undefined,
+  };
+}
+
 const LOCO_TYPE: Record<string, string> = {
-  steam: 'Steam Locomotive', tank: 'Tank Engine', bigsteam: 'Articulated Steam', diesel: 'Diesel Locomotive',
+  steam: 'Steam Locomotive', tank: 'Tank Engine', bigsteam: 'Articulated Steam', streamsteam: 'Streamlined Steam', diesel: 'Diesel Locomotive',
+  cabunit: 'Diesel Streamliner', hst: 'High-Speed Power Car', crocodile: 'Electric "Crocodile"', gg1: 'Streamlined Electric', roundnose: 'High-Speed Train', urbanmaglev: 'Urban Maglev',
   switcher: 'Diesel Shunter', electric: 'Electric Locomotive', tram: 'Electric Railcar', bullet: 'High-Speed Train',
   maglev: 'Maglev', hyperloop: 'Vactrain Concept',
 };
@@ -66,7 +78,7 @@ export const CardFace = memo(function CardFace({ look, size = 'md', showFact = f
   const v = look.variety ?? 'std';
   const style = { '--rc': RARITY_COLOR[def.rarity], '--s1': set.color, '--s2': set.color2 } as CSSProperties;
   const cls = `card size-${size} r-${def.rarity} v-${v}${look.first ? ' first' : ''}`;
-  const spec = { loco: def.loco, scene: def.scene, body: def.body, accent: def.accent, sky: def.sky, seed: hashSeed(def.id), number: cardNumber(def) };
+  const spec = artSpec(def);
   const numLabel = def.num > 24 ? `${def.num}/24` : `${String(def.num).padStart(2, '0')}/24`;
   const face = (
     <div className={cls} style={style}>
@@ -139,7 +151,7 @@ export function CardBack({ size = 'md', glow, className }: { size?: string; glow
 export function PackArt({ set, size = 'md', className, onClick }: { set: SetId; size?: 'sm' | 'md' | 'lg'; className?: string; onClick?: () => void }) {
   const def = SET_BY_ID[set];
   const hero = Object.values(CARD_BY_ID).find((c) => c.set === set && c.rarity === 'UR')!;
-  const spec = { loco: hero.loco, scene: hero.scene, body: hero.body, accent: hero.accent, sky: hero.sky, seed: hashSeed(hero.id), number: cardNumber(hero) };
+  const spec = artSpec(hero);
   return (
     <div className={`pack pack-${set} size-${size} ${className ?? ''}`} style={{ '--s1': def.color, '--s2': def.color2 } as CSSProperties} onClick={onClick}>
       <div className="pack-crimp top" />

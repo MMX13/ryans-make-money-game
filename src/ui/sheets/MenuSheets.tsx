@@ -5,25 +5,25 @@ import * as G from '../../engine/game';
 import { CardFace, RARITY_COLOR } from '../Card';
 import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
-import { Empty, Money, Sheet } from '../widgets';
+import { Empty, Icon, Money, Sheet } from '../widgets';
 
 export function MenuSheet() {
   const push = useStore((s) => s.push);
   const game = useStore((s) => s.game);
   const items: [string, string, string, () => void][] = [
-    ['⬆️', 'Upgrades', 'Better prices, more slots', () => push({ kind: 'upgrades' })],
-    ['🖼️', 'Display Case', `${game.display.filter((d) => d !== null).length}/${game.display.length} slots used`, () => push({ kind: 'display' })],
-    ['🏆', 'Achievements', `${game.achievements.length}/${G.ACHIEVEMENTS.length} unlocked`, () => push({ kind: 'achievements' })],
-    ['📊', 'Stats', 'Your tycoon career', () => push({ kind: 'stats' })],
-    ['❓', 'How to play', 'Ways to make money', () => push({ kind: 'help' })],
-    ['⚙️', 'Settings', 'Sound, haptics, save', () => push({ kind: 'settings' })],
+    ['upgrades', 'Upgrades', 'Better prices, more slots', () => push({ kind: 'upgrades' })],
+    ['display', 'Display Case', `${game.display.filter((d) => d !== null).length}/${game.display.length} slots used`, () => push({ kind: 'display' })],
+    ['trophy', 'Achievements', `${game.achievements.length}/${G.ACHIEVEMENTS.length} unlocked`, () => push({ kind: 'achievements' })],
+    ['stats', 'Stats', 'Your tycoon career', () => push({ kind: 'stats' })],
+    ['help', 'How to play', 'Ways to make money', () => push({ kind: 'help' })],
+    ['settings', 'Settings', 'Sound, haptics, save', () => push({ kind: 'settings' })],
   ];
   return (
     <Sheet title="Menu">
       <div className="menu-list">
         {items.map(([icon, title, sub, fn]) => (
           <button key={title} className="menu-item" onClick={() => { sfx.click(); fn(); }}>
-            <span className="menu-icon">{icon}</span>
+            <span className="menu-icon"><Icon name={icon} /></span>
             <span className="grow"><b>{title}</b><small className="muted">{sub}</small></span>
             <span className="muted">›</span>
           </button>

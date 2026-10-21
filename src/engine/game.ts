@@ -78,6 +78,7 @@ export interface GameState {
   hypeHist: Record<SetId, number[]>;
   demand: Record<string, number>;
   sealedDemand: Record<SetId, number>;
+  packCost: Record<SetId, number>;
   event: MarketEvent | null;
   nextEventAt: number;
   listings: Listing[];
@@ -121,8 +122,9 @@ export function newGame(now: number, seed = (Math.random() * 2 ** 32) >>> 0): Ga
     hypeHist: Object.fromEntries(ALL_SETS.map((id) => [id, [1]])) as Record<SetId, number[]>,
     demand: {},
     sealedDemand: zeroBySet(1),
+    packCost: zeroBySet(0),
     event: null,
-    nextEventAt: now + 4 * 60_000,
+    nextEventAt: now + 8 * 60_000,
     listings: [],
     grading: [],
     requests: [],
@@ -173,6 +175,13 @@ export function eventActive(s: GameState, kind: EventKind, set?: SetId): boolean
   return !!e && e.kind === kind && s.now >= e.startAt && s.now < e.endAt && (set === undefined || e.set === set);
 }
 
+/** Gold and Misprint cards are always worth a real amount, even on a common. */
+export function varietyBase(def: CardDef, variety: Variety): number {
+  const b = baseValue(def);
+  if (variety === 'gold' || variety === 'misprint') return Math.max(b, SET_BY_ID[def.set].packPrice * C.SPECIAL_BASE_FLOOR * C.SET_VALUE_BOOST[def.set]);
+  return b;
+}
+
 export function baseValue(def: CardDef): number {
   return SET_BY_ID[def.set].packPrice * C.RARITY_VALUE[def.rarity] * def.pop * C.SET_VALUE_BOOST[def.set];
 }
@@ -188,7 +197,7 @@ export function itemMult(inst: Pick<CardInst, 'variety' | 'first' | 'grade' | 'g
 export function value(s: GameState, inst: Pick<CardInst, 'cardId' | 'variety' | 'first' | 'grade' | 'grader'>): number {
   const def = CARD_BY_ID[inst.cardId];
   const d = s.demand[inst.cardId] ?? 1;
-  return round2(baseValue(def) * itemMult(inst, eventActive(s, 'holo')) * s.hype[def.set] * d);
+  return round2(varietyBase(def, inst.variety) * itemMult(inst, eventActive(s, 'holo')) * s.hype[def.set] * d);
 }
 
 export function dealerRate(s: GameState): number {
@@ -270,6 +279,8 @@ export interface PackResult {
   first: boolean;
   total: number;
   autoSoldTotal: number;
+  /** What the player paid for this pack (0 for free packs). */
+  paid: number;
 }
 
 function rollVariety(r: Rng, rarity: Rarity): Variety {
@@ -291,8 +302,12 @@ function rollGrade(r: Rng): number {
   return r.weighted(C.GRADE_DIST);
 }
 
-function pickCard(r: Rng, set: SetId, rarity: Rarity): CardDef {
-  return r.pick(CARDS_BY_SET[set].filter((c) => c.rarity === rarity));
+function pickCard(r: Rng, set: SetId, rarity: Rarity, used: Set<string>): CardDef {
+  const all = CARDS_BY_SET[set].filter((c) => c.rarity === rarity);
+  const fresh = all.filter((c) => !used.has(c.id));
+  const def = r.pick(fresh.length ? fresh : all);
+  used.add(def.id);
+  return def;
 }
 
 const NEXT_RARITY: Partial<Record<Rarity, Rarity>> = { R: 'SR', SR: 'UR', UR: 'SEC' };
@@ -301,6 +316,8 @@ export function hasLicense(s: GameState, set: SetId) { return s.licenses.include
 
 export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?: boolean; fake?: boolean }): PackResult | null {
   if (s.packs[set] <= 0) return null;
+  const paid = round2((s.packCost[set] ?? 0) / s.packs[set]);
+  s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) - paid));
   s.packs[set]--;
   const first = s.opened[set] < C.FIRST_EDITION_PACKS;
   s.opened[set]++;
@@ -310,7 +327,7 @@ export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?:
     const god = force?.god ?? (s.stats.packsOpened > 5 && r.chance(C.GOD_PACK));
     let fakeFrom: Rarity | null = null;
     if (god) {
-      for (let i = 0; i < 5; i++) rarities.push(r.weighted<Rarity>([['SR', 0.8], ['UR', 0.17], ['SEC', 0.03]]));
+      for (let i = 0; i < 5; i++) rarities.push(i < 2 ? 'SR' : r.weighted<Rarity>([['SR', 0.3], ['UR', 0.6], ['SEC', 0.1]]));
     } else {
       for (let i = 0; i < 3; i++) rarities.push(r.chance(C.COMMON_UPGRADE) ? 'U' : 'C');
       rarities.push('U');
@@ -324,8 +341,9 @@ export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?:
     }
     const hasBig = rarities.some((x) => x === 'UR' || x === 'SEC');
     s.pity[set] = hasBig ? 0 : s.pity[set] + 1;
+    const used = new Set<string>();
     const cards: PulledCard[] = rarities.map((rarity) => {
-      const def = pickCard(r, set, rarity);
+      const def = pickCard(r, set, rarity, used);
       const inst: CardInst = {
         uid: s.nextUid++,
         cardId: def.id,
@@ -340,7 +358,7 @@ export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?:
       s.seen[def.id] = true;
       return { inst, isNew, autoSold: false, value: 0 };
     });
-    return { set, cards, god, fakeFrom, first, total: 0, autoSoldTotal: 0 } as PackResult;
+    return { set, cards, god, fakeFrom, first, total: 0, autoSoldTotal: 0, paid } as PackResult;
   });
   for (const pc of result.cards) {
     s.cards.push(pc.inst);
@@ -370,6 +388,7 @@ export function buyPacks(s: GameState, set: SetId, count: number, asBox = false)
   if (s.cash + 1e-9 < cost) return false;
   spend(s, cost, 'packs');
   s.packs[set] += n;
+  s.packCost[set] = round2((s.packCost[set] ?? 0) + cost);
   return true;
 }
 
@@ -382,6 +401,7 @@ export function sellSealed(s: GameState, set: SetId, count: number): number {
     s.sealedDemand[set] = Math.max(0.5, (s.sealedDemand[set] ?? 1) * (1 - C.SEALED_PRESSURE));
   }
   amt = round2(amt);
+  s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) * (1 - n / s.packs[set])));
   s.packs[set] -= n;
   earn(s, amt, 'sealed');
   return amt;
@@ -559,15 +579,18 @@ function unlockedCards(s: GameState): CardDef[] {
 
 function makeRequest(s: GameState, r: Rng): Request {
   const pool = unlockedCards(s);
-  const weights: Record<Rarity, number> = { C: 2.5, U: 3, R: 3, SR: 1.6, UR: 0.5, SEC: 0.15 };
+  const weights: Record<Rarity, number> = { C: 1, U: 1.5, R: 3, SR: 2, UR: 0.6, SEC: 0.15 };
   // favour the newest set a little so requests stay relevant
   const top = s.licenses[s.licenses.length - 1];
   const def = r.weighted(pool.map((c) => [c, weights[c.rarity] * (c.set === top ? 2 : 1)] as [CardDef, number]));
   const needVariety = def.rarity !== 'C' && r.chance(0.25);
-  const minGrade = r.chance(0.22) ? r.pick([8, 8, 9, 9, 9.5]) : 0;
+  // only ask for graded copies of cards worth grading
+  const gradeable = C.RARITY_VALUE[def.rarity] >= C.RARITY_VALUE.R;
+  const minGrade = gradeable && r.chance(0.25) ? r.pick([8, 8, 9, 9, 9.5]) : 0;
   const hyp = { cardId: def.id, variety: (needVariety ? 'holo' : 'std') as Variety, first: false, grade: minGrade || undefined, grader: 'plat' as GraderId };
   const v = baseValue(def) * itemMult(hyp) * s.hype[def.set];
-  let pay = v * r.range(1.5, 2.2) + SET_BY_ID[def.set].packPrice * r.range(0.3, 0.8);
+  const fee = minGrade ? C.GRADERS.plat.flat + C.GRADERS.plat.pct * v : 0;
+  let pay = v * r.range(1.6, 2.3) + fee * 1.5 + SET_BY_ID[def.set].packPrice * r.range(0.1, 0.3);
   if (eventActive(s, 'convention')) pay *= 1.5;
   return {
     id: s.nextId++,
@@ -719,11 +742,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'holo', name: 'Shiny!', desc: 'Pull a Holo card', reward: 10, test: (s) => s.cards.some((c) => c.variety === 'holo') },
   { id: 'sr', name: 'Super Find', desc: 'Pull a Super Rare', reward: 15, test: (s) => s.cards.some((c) => card(c).rarity === 'SR') },
   { id: 'ur', name: 'Chase Card', desc: 'Pull an Ultra Rare', reward: 50, test: (s) => s.cards.some((c) => card(c).rarity === 'UR') },
-  { id: 'sec', name: 'Secret Service', desc: 'Pull a Secret Rare', reward: 200, test: (s) => s.cards.some((c) => card(c).rarity === 'SEC') },
-  { id: 'gold', name: 'Gold Rush', desc: 'Own a Gold card', reward: 150, test: (s) => s.cards.some((c) => c.variety === 'gold') },
-  { id: 'misprint', name: 'Happy Accident', desc: 'Own a Misprint', reward: 300, test: (s) => s.cards.some((c) => c.variety === 'misprint') },
+  { id: 'sec', name: 'Secret Service', desc: 'Pull a Secret Rare', reward: 100, test: (s) => s.cards.some((c) => card(c).rarity === 'SEC') },
+  { id: 'gold', name: 'Gold Rush', desc: 'Own a Gold card', reward: 40, test: (s) => s.cards.some((c) => c.variety === 'gold') },
+  { id: 'misprint', name: 'Happy Accident', desc: 'Own a Misprint', reward: 75, test: (s) => s.cards.some((c) => c.variety === 'misprint') },
   { id: 'grade1', name: 'Slabbed', desc: 'Get a card graded', reward: 10, test: (s) => s.stats.graded >= 1 },
-  { id: 'gem', name: 'Gem Mint', desc: 'Get a perfect 10', reward: 500, test: (s) => s.stats.tens >= 1 },
+  { id: 'gem', name: 'Gem Mint', desc: 'Get a perfect 10', reward: 150, test: (s) => s.stats.tens >= 1 },
   { id: 'req1', name: 'Customer Service', desc: 'Complete a collector request', reward: 20, test: (s) => s.stats.requests >= 1 },
   { id: 'req25', name: 'Trusted Dealer', desc: 'Complete 25 collector requests', reward: 5000, test: (s) => s.stats.requests >= 25 },
   { id: 'bounty1', name: 'Completionist', desc: 'Complete a set', reward: 100, test: (s) => s.bounties.length >= 1 },
@@ -791,7 +814,11 @@ export function eventText(e: MarketEvent): string {
 }
 
 function scheduleEvent(s: GameState, r: Rng) {
-  const kinds: [EventKind, number][] = [['boom', 3], ['crash', 2.5], ['holo', 1], ['gradeRush', 1], ['convention', 1.2], ['sale', 1]];
+  // new players get a friendly first event and no crashes in their first 20 minutes
+  const fresh = s.now - s.createdAt < 20 * 60_000;
+  const kinds: [EventKind, number][] = fresh
+    ? [['boom', 3], ['holo', 1], ['convention', 1.2], ['sale', 1]]
+    : [['boom', 3], ['crash', 2.5], ['holo', 1], ['gradeRush', 1], ['convention', 1.2], ['sale', 1]];
   const kind = r.weighted(kinds);
   const startAt = s.now + 60_000;
   const ev: MarketEvent = { kind, startAt, endAt: startAt + r.range(3, 5) * 60_000 };
@@ -925,5 +952,6 @@ export function migrate(raw: any): GameState | null {
   if (!raw || typeof raw !== 'object' || raw.version !== SAVE_VERSION || !Array.isArray(raw.cards)) return null;
   const s = raw as GameState;
   s.sealedDemand ??= zeroBySet(1);
+  s.packCost ??= zeroBySet(0);
   return s;
 }

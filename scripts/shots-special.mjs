@@ -18,7 +18,7 @@ await page.waitForTimeout(600);
 await page.evaluate(() => {
   const { useStore, G } = window.__rr;
   useStore.getState().act((g) => {
-    g.cash = 250000; g.tutorial = 9;
+    g.cash = 250000; g.tutorial = 31;
     g.licenses = ['iron', 'diesel', 'electric', 'bullet', 'maglev'];
     const add = (cardId, variety, first, grade, grader) => g.cards.push({ uid: g.nextUid++, cardId, variety, first, tg: grade ?? 9, z: 0.2, status: 'binder', at: Date.now(), grade, grader });
     add('IH-23', 'std', true); add('IH-24', 'holo', false); add('DD-21', 'full', false); add('EA-23', 'gold', true);

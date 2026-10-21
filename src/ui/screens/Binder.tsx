@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { CARDS_BY_SET, SETS, SET_BY_ID, type Rarity } from '../../engine/data';
 import { RARITY_NAME } from '../../engine/config';
 import * as G from '../../engine/game';
-import { CardFace, RARITY_COLOR, RARITY_SYMBOL } from '../Card';
+import { CardFace, RARITY_COLOR, RARITY_SYMBOL, artSpec } from '../Card';
+import { TrainArt } from '../../art/TrainArt';
 import { worthGrading } from '../sheets/CardSheet';
 import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
@@ -91,7 +92,7 @@ function SetView({ setId, onSet }: { setId: G.PackResult['set']; onSet: (s: G.Pa
         {cards.map((def) => {
           const e = bestByCard.get(def.id);
           return (
-            <button key={def.id} className={'binder-slot' + (e ? ' have' : '')} onClick={() => push({ kind: 'cardDef', cardId: def.id })}>
+            <button key={def.id} className={'binder-slot' + (e ? ' have' : '')} onClick={() => push(e && e.n === 1 ? { kind: 'card', uid: e.inst.uid } : { kind: 'cardDef', cardId: def.id })}>
               {e ? (
                 <>
                   <CardFace look={e.inst} size="sm" />
@@ -99,6 +100,7 @@ function SetView({ setId, onSet }: { setId: G.PackResult['set']; onSet: (s: G.Pa
                 </>
               ) : (
                 <div className="silhouette sm" style={{ '--rc': RARITY_COLOR[def.rarity] } as React.CSSProperties}>
+                  <TrainArt spec={artSpec(def)} className="sil-art" />
                   <span>#{def.num}</span>
                   <b>{game.seen[def.id] ? def.name : def.rarity === 'SEC' ? '???' : def.name}</b>
                   <small>{RARITY_SYMBOL[def.rarity]}</small>
@@ -130,7 +132,7 @@ function AllView({ filter, setFilter }: { filter: Filter; setFilter: (f: Filter)
   return (
     <>
       <div className="chips">
-        {([['all', 'All'], ['hits', 'Rare+'], ['special', 'Holo & 1st'], ['graded', 'Graded'], ['grade', 'Worth grading']] as [Filter, string][]).map(([f, l]) => (
+        {([['all', 'All'], ['hits', 'Rare+'], ['special', 'Holo & 1st'], ['graded', 'Slabs'], ['grade', 'To grade']] as [Filter, string][]).map(([f, l]) => (
           <button key={f} className={'chip' + (filter === f ? ' on' : '')} onClick={() => setFilter(f)}>{l}</button>
         ))}
       </div>

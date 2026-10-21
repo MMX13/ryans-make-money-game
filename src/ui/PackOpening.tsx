@@ -43,7 +43,9 @@ function SingleOpening() {
   const realRarity = curDef?.rarity ?? 'C';
   const glowRarity: Rarity | null = !cur || flipped ? null
     : (isHit || result.god) && RANK[realRarity] >= 2 ? (result.fakeFrom && isHit && !cracked ? result.fakeFrom : realRarity)
+    : cur.inst.variety === 'gold' || cur.inst.variety === 'misprint' ? 'UR'
     : cur.inst.variety !== 'std' ? 'R' : null;
+  const bigHit = !!cur && (RANK[realRarity] >= 4 || cur.inst.variety === 'gold' || cur.inst.variety === 'misprint');
   const needsHold = !flipped && (realRarity === 'UR' || realRarity === 'SEC') && (!result.fakeFrom || !isHit || cracked);
 
   // tear
@@ -86,9 +88,11 @@ function SingleOpening() {
     const r = curDef.rarity;
     sfx.flip();
     if (RANK[r] >= 2 || cur.inst.variety !== 'std') {
+      const special = cur.inst.variety === 'gold' || cur.inst.variety === 'misprint';
+      const fx: Rarity = special && RANK[r] < 4 ? 'UR' : RANK[r] >= 2 ? r : 'R';
       setTimeout(() => {
-        sfx.reveal(RANK[r] >= 2 ? r : 'U');
-        setBurst(RANK[r] >= 2 ? r : 'R');
+        sfx.reveal(special ? fx : RANK[r] >= 2 ? r : 'U');
+        setBurst(fx);
         buzz(RANK[r] >= 4 ? [60, 40, 90, 40, 140] : RANK[r] >= 3 ? [30, 30, 60] : 25);
       }, 180);
     }
@@ -140,7 +144,6 @@ function SingleOpening() {
   const set = SET_BY_ID[result.set];
   const game = useStore((s) => s.game);
   const packsLeft = game.packs[result.set];
-  const shopPrice = G.packPrice(game, result.set);
   const dupes = phase === 'summary' ? G.bulkCandidates(game, cards.map((c) => c.inst.uid)) : [];
   const dupeValue = dupes.reduce((a, c) => a + G.dealerPrice(game, c), 0);
 
@@ -152,7 +155,7 @@ function SingleOpening() {
 
   if (phase === 'summary') {
     const best = [...cards].sort((a, b) => b.value - a.value)[0];
-    const profit = result.total - shopPrice;
+    const profit = result.total - result.paid;
     return (
       <div className="opening summary-phase" style={{ '--s1': set.color, '--s2': set.color2 } as CSSProperties}>
         <div className="sum-head">
@@ -160,8 +163,8 @@ function SingleOpening() {
           <h2>{set.name}{result.first ? <span className="badge first-badge">1st Edition</span> : null}</h2>
           <div className="sum-total">
             <span>Pack value</span>
-            <CountUp value={result.total} className={'big ' + (profit >= 0 ? 'pos' : 'neg')} />
-            <small>Shop price <Money v={shopPrice} /> · {profit >= 0 ? 'Profit' : 'Short'} <Money v={Math.abs(profit)} /></small>
+            <CountUp value={result.total} className={'big ' + (profit >= 0 ? 'pos' : '')} />
+            <small>{result.paid > 0 ? <>You paid <Money v={result.paid} /> · </> : 'Free pack · '}{profit >= 0 ? <span className="pos">+<Money v={profit} /> profit</span> : <span className="muted">−<Money v={-profit} /></span>}</small>
           </div>
         </div>
         <div className="sum-grid">
@@ -231,7 +234,7 @@ function SingleOpening() {
             ))}
           </div>
           <div
-            className={`flip-card ${flipped ? 'flipped' : ''} ${needsHold && !flipped ? 'holdable' : ''} ${cracked ? 'cracked' : ''}`}
+            className={`flip-card ${flipped ? 'flipped' : ''} ${needsHold && !flipped ? 'holdable' : ''} ${cracked ? 'cracked' : ''} ${flipped && bigHit ? 'big-hit' : ''} hit-${realRarity}`}
             style={{ '--charge': charge } as CSSProperties}
             onClick={tapCard}
             onPointerDown={holdStart}
@@ -262,7 +265,8 @@ function SingleOpening() {
                   {cur.inst.first && <span className="tag first">1st Edition</span>}
                   {cur.isNew && <span className="tag new">NEW</span>}
                 </div>
-                <CountUp value={cur.value} className="rv-value" duration={RANK[curDef.rarity] >= 3 ? 900 : 400} />
+                <CountUp value={cur.value} className="rv-value" duration={bigHit ? 1600 : RANK[curDef.rarity] >= 3 ? 900 : 400} />
+                {bigHit && <div className="float-cash" key={cur.inst.uid}>+<Money v={cur.value} /></div>}
               </div>
             ) : (
               <div className="hint">
@@ -312,7 +316,11 @@ function QuickSummary() {
   const game = useStore((s) => s.game);
   const all = opening.results.flatMap((r) => r.cards);
   const total = opening.results.reduce((a, r) => a + r.total, 0);
-  const cost = opening.results.length * G.packPrice(game, opening.set);
+  const cost = opening.results.reduce((a, r) => a + r.paid, 0);
+  const newCount = all.filter((pc) => pc.isNew).length;
+  const dupes = G.bulkCandidates(game, all.map((pc) => pc.inst.uid));
+  const dupeValue = dupes.reduce((a, c) => a + G.dealerPrice(game, c), 0);
+  const act = useStore((s) => s.act);
   const hits = all.filter(isSpecial).sort((a, b) => b.value - a.value);
   const counts: Record<Rarity, number> = { C: 0, U: 0, R: 0, SR: 0, UR: 0, SEC: 0 };
   for (const pc of all) counts[CARD_BY_ID[pc.inst.cardId].rarity]++;
@@ -331,8 +339,9 @@ function QuickSummary() {
         <h2>Opened {opening.results.length} {set.name} packs</h2>
         <div className="sum-total">
           <span>Total value</span>
-          <CountUp value={total} className={'big ' + (total >= cost ? 'pos' : 'neg')} duration={900} />
-          <small>Shop price <Money v={cost} />{autoSold > 0 ? <> · auto-sold <Money v={autoSold} /></> : null}</small>
+          <CountUp value={total} className={'big ' + (total >= cost ? 'pos' : '')} duration={900} />
+          <small>You paid <Money v={cost} /> · {total >= cost ? <span className="pos">+<Money v={total - cost} /> profit</span> : <span className="muted">−<Money v={cost - total} /></span>}{autoSold > 0 ? <> · auto-sold <Money v={autoSold} /></> : null}</small>
+          {newCount > 0 && <small className="pos">{newCount} new card{newCount > 1 ? 's' : ''} for your binder!</small>}
         </div>
         <div className="rarity-counts">
           {(Object.keys(counts) as Rarity[]).filter((r) => counts[r]).map((r) => (
@@ -349,7 +358,14 @@ function QuickSummary() {
         ))}
       </div>
       {hits.length > 30 && <p className="muted center">+{hits.length - 30} more in your Binder</p>}
-      <div className="sum-actions"><button className="btn primary" onClick={() => setOpening(null)}>Done</button></div>
+      <div className="sum-actions">
+        {dupes.length > 0 && (
+          <button className="btn ghost" onClick={() => { act((g) => G.sellCards(g, G.bulkCandidates(g, all.map((pc) => pc.inst.uid)), true)); sfx.coin(); }}>
+            Bulk-sell {dupes.length} duplicates · <Money v={dupeValue} />
+          </button>
+        )}
+        <button className="btn primary" onClick={() => setOpening(null)}>Done</button>
+      </div>
     </div>
   );
 }

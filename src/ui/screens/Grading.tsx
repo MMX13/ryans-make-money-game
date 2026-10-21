@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import { GRADERS, gradeMult } from '../../engine/config';
 import * as G from '../../engine/game';
 import { CardBack, CardFace, Tilt, gradeLabel } from '../Card';
@@ -26,12 +26,7 @@ export function Grading() {
     const inst0 = game.cards.find((c) => c.uid === uid)!;
     const before = G.value(game, { ...inst0, grade: undefined });
     const inst = act((g) => G.crackSlab(g, uid));
-    if (inst) {
-      sfx.crack();
-      buzz(inst.grade! >= 9.5 ? [60, 40, 120] : 20);
-      setTimeout(() => sfx.reveal(inst.grade! >= 10 ? 'SEC' : inst.grade! >= 9.5 ? 'UR' : inst.grade! >= 9 ? 'SR' : inst.grade! >= 8 ? 'R' : 'C'), 500);
-      setReveal({ inst, before });
-    }
+    if (inst) { sfx.slab(); buzz(15); setReveal({ inst, before }); }
   };
 
   return (
@@ -58,13 +53,14 @@ export function Grading() {
           );
         })}
       </div>
+      <h4 className="section">Grade → value multiplier</h4>
       <div className="grade-table">
         {[10, 9.5, 9, 8, 7, 6].map((g) => (
           <div key={g}><b>{g === 6 ? '≤6' : g}</b><small>×{gradeMult(g)}</small></div>
         ))}
       </div>
       <h4 className="section">Candidates <small className="muted">· best estimates first</small></h4>
-      {!candidates.length ? <Empty icon="🔍" title="Nothing to grade">Pull some cards first. High estimates are worth grading.</Empty> : (
+      {!candidates.length ? <Empty icon="🔍" title="Nothing worth grading">Only cards worth $1 or more are listed here. Rares and better with high estimates are the best bets.</Empty> : (
         <div className="card-list">
           {candidates.map(({ c, v, est, worth }) => (
             <button key={c.uid} className="list-row" onClick={() => push({ kind: 'card', uid: c.uid })}>
@@ -88,23 +84,41 @@ export function Grading() {
 
 function SlabReveal({ inst, before, onClose }: { inst: G.CardInst; before: number; onClose: () => void }) {
   const game = useStore((s) => s.game);
+  const [open, setOpen] = useState(false);
   const after = G.value(game, inst);
   const g = inst.grade!;
   const tier = g >= 10 ? 'gem' : g >= 9 ? 'good' : g >= 8 ? 'ok' : 'bad';
+  const reveal = () => {
+    if (open) { onClose(); return; }
+    setOpen(true);
+    sfx.crack();
+    buzz(g >= 9.5 ? [60, 40, 120] : 25);
+    setTimeout(() => sfx.reveal(g >= 10 ? 'SEC' : g >= 9.5 ? 'UR' : g >= 9 ? 'SR' : g >= 8 ? 'R' : 'C'), 350);
+  };
   return (
-    <div className="slab-reveal" onClick={onClose}>
-      <div className={'slab-stage t-' + tier}>
+    <div className="slab-reveal" onClick={reveal}>
+      {open && g >= 9.5 && <div className="slab-rays" />}
+      <div className={'slab-stage t-' + tier + (open ? ' open' : ' sealed')}>
         <div className="slab-anim">
-          <Tilt><CardFace look={inst} size="lg" /></Tilt>
+          {open ? <Tilt><CardFace look={inst} size="lg" /></Tilt> : (
+            <div className="slab size-lg sealed-slab">
+              <div className="slab-label"><div className="slab-left"><b>{GRADERS[inst.grader!].short}</b><span>{G.card(inst).name}</span></div><div className="slab-grade"><small>GRADE</small><b>?</b></div></div>
+              <div className="slab-well"><CardFace look={{ ...inst, grade: undefined }} size="lg" /></div>
+            </div>
+          )}
         </div>
-        <div className="slab-result">
-          <div className="grade-big" style={{ '--d': '0.5s' } as CSSProperties}>{g}</div>
-          <div className="grade-word">{gradeLabel(g)}</div>
-          <div className="delta">
-            <Money v={before} /> → <CountUp value={after} className={after >= before ? 'pos' : 'neg'} duration={1200} />
+        {open ? (
+          <div className="slab-result">
+            <div className="grade-big">{g}</div>
+            <div className="grade-word">{gradeLabel(g)}</div>
+            <div className="delta">
+              <Money v={before} /> → <CountUp value={after} className={after >= before ? 'pos' : 'neg'} duration={1200} />
+            </div>
+            <small className="muted">Tap to continue</small>
           </div>
-          <small className="muted">Tap to continue</small>
-        </div>
+        ) : (
+          <div className="slab-result"><div className="hint pulse">Tap to reveal the grade</div></div>
+        )}
       </div>
       <div style={{ display: 'none' }}><CardBack /></div>
     </div>

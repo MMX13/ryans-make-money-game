@@ -37,9 +37,11 @@ export const FIRST_EDITION_PACKS = 30;
 export const FIRST_EDITION_MULT = 1.5;
 
 export type Variety = 'std' | 'holo' | 'full' | 'gold' | 'misprint';
-export const VARIETY_MULT: Record<Variety, number> = { std: 1, holo: 2, full: 3, gold: 10, misprint: 15 };
+export const VARIETY_MULT: Record<Variety, number> = { std: 1, holo: 2.5, full: 3, gold: 10, misprint: 15 };
+/** Minimum base value (fraction of pack price) for Gold and Misprint cards. */
+export const SPECIAL_BASE_FLOOR = 0.2;
 export const VARIETY_NAME: Record<Variety, string> = { std: 'Standard', holo: 'Holo', full: 'Full Art', gold: 'Gold', misprint: 'Misprint' };
-export const VARIETY_ODDS = { misprint: 0.002, gold: 0.006, fullOfSR: 0.15, holo: 0.12 };
+export const VARIETY_ODDS = { misprint: 0.002, gold: 0.006, fullOfSR: 0.15, holo: 0.08 };
 
 /** True grade distribution. */
 export const GRADE_DIST: [number, number][] = [
@@ -102,7 +104,7 @@ export const SINGLES_ROTATE_MS = 4 * 60_000;
 
 export type UpgradeId = 'haggle' | 'listings' | 'display' | 'loupe' | 'gradeSlots' | 'autoBulk';
 export const UPGRADES: Record<UpgradeId, { name: string; desc: (lvl: number) => string; costs: number[]; icon: string }> = {
-  haggle: { name: 'Haggling', icon: '🤝', desc: (l) => `Dealer pays ${Math.round((DEALER_BASE + DEALER_PER_HAGGLE * l) * 100)}% of value`, costs: [150, 1000, 6000, 30000, 150000] },
+  haggle: { name: 'Haggling', icon: '🤝', desc: (l) => `Dealer pays ${Math.round((DEALER_BASE + DEALER_PER_HAGGLE * l) * 100)}% of value`, costs: [400, 2000, 8000, 40000, 150000] },
   listings: { name: 'Listing Slots', icon: '🏷️', desc: (l) => `${3 + l} marketplace listings at once`, costs: [100, 600, 3000, 15000, 75000] },
   display: { name: 'Display Case', icon: '🖼️', desc: (l) => `${2 + l} display slots`, costs: [200, 1200, 6000, 25000, 100000, 300000] },
   loupe: { name: 'Jeweler\'s Loupe', icon: '🔍', desc: (l) => ['Rough condition estimates', 'Better condition estimates', 'Sharp condition estimates', 'Near-perfect condition estimates'][l], costs: [300, 4000, 40000] },

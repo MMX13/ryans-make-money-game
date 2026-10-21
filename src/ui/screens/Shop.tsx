@@ -79,7 +79,7 @@ export function Shop() {
             <div className="set-info">
               <div className="set-title">
                 <b>{set.name}</b>
-                <button className="link" onClick={() => push({ kind: 'odds', set: set.id })}>Odds</button>
+                <button className="link odds-link" onClick={() => push({ kind: 'odds', set: set.id })}>Odds ⓘ</button>
               </div>
               <div className="price-line">
                 <span className="price"><Money v={price} /></span>

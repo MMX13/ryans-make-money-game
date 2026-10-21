@@ -77,7 +77,7 @@ function Header() {
       <div className="hdr-nw">
         <small>Net worth {next ? <span className="muted">→ {G.fmtMoney(next, true)}</span> : '· Rail Baron'}</small>
         <b><Rolling value={nw} compact={nw >= 1e5} /></b>
-        <Progress value={next ? (Math.log10(Math.max(nw, 1)) - Math.log10(Math.max(prev, 1))) / (Math.log10(next) - Math.log10(Math.max(prev, 1))) : 1} className="thin gold" />
+        <Progress value={next ? (nw - prev) / (next - prev) : 1} className="thin gold" />
       </div>
       <button className="icon-btn menu-btn" aria-label="Menu" onClick={() => { sfx.click(); push({ kind: 'menu' }); }}><Icon name="menu" /></button>
     </header>
@@ -119,6 +119,7 @@ function Toasts() {
   useEffect(() => {
     for (const n of notices) {
       if (seen.current.has(n.id)) continue;
+      if (opening && n.kind !== 'milestone') continue; // shown once the pack is done
       seen.current.add(n.id);
       setVisible((v) => [...v.slice(-2), n]);
       if (n.kind === 'sale' || n.kind === 'request') sfx.coin();
@@ -129,7 +130,7 @@ function Toasts() {
       setTimeout(() => setVisible((v) => v.filter((x) => x.id !== n.id)), ttl);
     }
     if (notices.length) act((g) => { g.notices = g.notices.filter((x) => !seen.current.has(x.id)); });
-  }, [notices]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notices, opening]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={'toasts' + (opening ? ' over' : '')}>
       {visible.map((n) => (
@@ -142,36 +143,37 @@ function Toasts() {
   );
 }
 
+interface Tip { tab: Tab | null; text: string; done: (g: G.GameState) => boolean; go?: Tab }
+const TIPS: Tip[] = [
+  { tab: 'shop', text: 'Welcome, tycoon! You start with $20. Claim your free pack, or buy one.', done: (g) => g.stats.packsOpened > 0 || SETS.some((s) => g.packs[s.id] > 0) },
+  { tab: null, text: 'You have a pack! Tap Rip to tear it open.', go: 'rip', done: (g) => g.stats.packsOpened > 0 },
+  { tab: 'binder', text: 'Tap a card to sell it. The marketplace pays far more than the dealer, but takes a little time.', done: (g) => g.listings.length > 0 || g.stats.sales > 0 },
+  { tab: 'market', text: 'Collectors pay big for specific cards. Prices of each set rise and fall: buy in a dip, sell in a boom.', done: () => false },
+  { tab: 'grading', text: 'Cards with a high condition estimate can grade as a 10, worth ×5. Low grades are worth less!', done: (g) => g.stats.graded > 0 },
+];
+
 function Coach() {
   const game = useStore((s) => s.game);
   const tab = useStore((s) => s.tab);
   const act = useStore((s) => s.act);
   const setTab = useStore((s) => s.setTab);
+  const [hidden, setHidden] = useState<number[]>([]);
+  // tips are done once their action happens, or when dismissed
+  const doneMask = TIPS.map((t, i) => Boolean((game.tutorial >> i) & 1) || t.done(game));
   useEffect(() => {
-    if (game.tutorial <= 1 && game.stats.packsOpened > 0) act((g) => { g.tutorial = Math.max(g.tutorial, 2); });
-  }, [game.tutorial, game.stats.packsOpened]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (game.tutorial >= 5) return null;
-  const packs = SETS.reduce((a, s) => a + game.packs[s.id], 0);
-  let msg: string | null = null;
-  let go: Tab | null = null;
-  let step = game.tutorial;
-  if (step === 0) {
-    if (game.stats.packsOpened > 0) step = 2;
-    else if (packs > 0) step = 1;
-  }
-  if (step === 0) { msg = 'Welcome, tycoon! Start with $20. Claim your free pack, or buy one.'; go = tab === 'shop' ? null : 'shop'; }
-  else if (step === 1) { msg = game.stats.packsOpened > 0 ? null : 'You have a pack! Head to Rip to tear it open.'; go = tab === 'rip' ? null : 'rip'; }
-  else if (step === 2) { msg = 'Nice pulls! Hits sell best on the marketplace: open a card in your Binder and list it.'; go = tab === 'binder' ? null : 'binder'; }
-  else if (step === 3) { msg = 'Check the Market for collector requests and price trends. Grade cards with high condition estimates.'; go = tab === 'market' ? null : 'market'; }
-  else if (step === 4) { msg = 'Grow your net worth to $1,000,000. New licenses in the Shop unlock bigger sets. Good luck!'; }
-  if (!msg) return null;
-  const next = () => act((g) => { g.tutorial = Math.max(step, g.tutorial) + 1; });
+    const mask = doneMask.reduce((m, d, i) => (d ? m | (1 << i) : m), 0);
+    if ((mask | game.tutorial) !== game.tutorial) act((g) => { g.tutorial |= mask; });
+  }, [doneMask.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const idx = TIPS.findIndex((t, i) => !doneMask[i] && !hidden.includes(i) && (t.tab === null ? tab !== t.go : t.tab === tab) && (i < 2 || doneMask[0]));
+  if (idx < 0) return null;
+  const tip = TIPS[idx];
+  const dismiss = () => { setHidden([...hidden, idx]); if (idx >= 2) act((g) => { g.tutorial |= 1 << idx; }); };
   return (
     <div className="coach">
-      <span>{msg}</span>
+      <span>{tip.text}</span>
       <div className="coach-btns">
-        {go && <button className="btn tiny primary" onClick={() => { setTab(go!); if (step >= 2) next(); }}>Show me</button>}
-        <button className="btn tiny ghost" onClick={next}>{step >= 4 ? 'Let’s go!' : 'Got it'}</button>
+        {tip.go && <button className="btn tiny primary" onClick={() => setTab(tip.go!)}>Go</button>}
+        <button className="btn tiny ghost" onClick={dismiss}>Got it</button>
       </div>
     </div>
   );

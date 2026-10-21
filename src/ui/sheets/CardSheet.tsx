@@ -49,7 +49,7 @@ export function CardSheet({ uid }: { uid: number }) {
   };
 
   return (
-    <Sheet title={<span style={{ color: RARITY_COLOR[def.rarity] }}>{RARITY_NAME[def.rarity]}{inst.variety !== 'std' ? ' · ' + VARIETY_NAME[inst.variety] : ''}</span>} className="card-sheet">
+    <Sheet title={<span className="sheet-title-card">{def.name}<small style={{ color: RARITY_COLOR[def.rarity] }}>{RARITY_NAME[def.rarity]}{inst.variety !== 'std' ? ' · ' + VARIETY_NAME[inst.variety] : ''}{inst.first ? ' · 1st Edition' : ''}</small></span>} className="card-sheet">
       <div className="cs-card"><Tilt><CardFace look={inst} size="lg" showFact /></Tilt></div>
       <div className="cs-stats">
         <div><small>Market value</small><b><Money v={v} /></b></div>
@@ -195,7 +195,7 @@ export function CardDefSheet({ cardId }: { cardId: string }) {
         {best ? <Tilt><CardFace look={best} size="lg" showFact /></Tilt> : <div className="silhouette lg"><span>#{def.num}</span><b>{def.name}</b><small>{RARITY_NAME[def.rarity]}</small></div>}
       </div>
       <p className="muted center small">{def.fact}</p>
-      <p className="center small">Raw Standard value ≈ <Money v={G.value(game, { cardId, variety: 'std', first: false })} /></p>
+      <p className="center small">A plain ungraded copy is worth about <Money v={G.value(game, { cardId, variety: 'std', first: false })} /></p>
       {copies.length ? (
         <div className="copy-list">
           {copies.map((c) => (

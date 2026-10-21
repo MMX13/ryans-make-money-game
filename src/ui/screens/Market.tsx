@@ -59,7 +59,7 @@ export function Market() {
                 <Money v={q.pay} className="pos" />
                 {match ? (
                   <button className="btn gold tiny" onClick={() => { act((g) => G.fulfilRequest(g, q.id, match.uid)); sfx.bigCoin(); buzz([20, 30, 40]); }}>Deliver</button>
-                ) : <small className="muted">{owned ? 'Not this copy' : 'Not owned'}</small>}
+                ) : <small className="muted">{!owned ? 'Not owned' : q.minGrade ? `Needs ${q.minGrade}+ slab` : q.needVariety ? 'Needs Holo+' : 'Not available'}</small>}
               </div>
             </div>
           );
@@ -105,7 +105,7 @@ export function Market() {
                 <small className="single-name">{def.name}{sg.variety !== 'std' ? ` · ${VARIETY_NAME[sg.variety]}` : ''}</small>
                 {!owned && <small className="badge need">Need</small>}
                 <button className="btn tiny" disabled={game.cash < price} onClick={() => { if (act((g) => G.buySingle(g, sg.id))) { sfx.coin(); buzz(10); } }}>
-                  <Money v={price} />
+                  Buy <Money v={price} />
                 </button>
               </div>
             );
