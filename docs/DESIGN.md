@@ -1,184 +1,152 @@
-# Rail Riches — Game Design (v1 draft)
+# Rail Riches — Game Design (v2)
 
 A phone-first browser game about getting rich from collectible train cards.
-You start with a little cash, rip packs, hunt for rare varieties and editions,
-grade your best pulls, play the market, and grow into a card-trading tycoon.
+Start with $20, rip packs, hunt rare varieties and 1st Editions, grade your best
+pulls, ride the market and work your way up to a **$1,000,000 net worth**
+("Rail Baron"). Play continues afterwards.
 
-Goal: reach **$1,000,000 net worth** ("Rail Baron"). Play can continue after.
+v2 incorporates an external design review (pacing, exploits, clarity).
 
 ## Pillars
 
-1. **Ripping packs feels great.** Tactile tear, slow-roll reveal, rarity
-   telegraphing, foil shimmer, sound and haptics. Every pack has a chance at a
-   life-changing hit.
-2. **Many ways to make money.** Flipping pulls, grading gambles, market
-   trading, sealed speculation, collector requests, a passive display case,
-   set completion rewards.
-3. **Readable economy.** Every card has a visible market price that moves for
-   understandable reasons (trends, events, scarcity, set rotation).
-4. **Short sessions, real progress.** 30 s – 5 min sessions. Timers (grading,
-   listings) resolve while away (capped).
+1. **Ripping packs feels great.** Tear, auto-fanned commons, a suspenseful hit
+   slot (glow, fake-out upgrades, hold-to-reveal), foil shimmer, sound, haptics.
+2. **Distinct ways to make money**, each with its own skill:
+   flipping (dealer vs listing), grading gambles, collector requests,
+   hype speculation on sealed product, set completion bounties, and a capped
+   display case.
+3. **Readable economy.** Each set has one *hype index* that moves every minute
+   and is shown as a chart. Events are announced in advance.
+4. **Pacing targets:** $1k ≈ 10 min, $10k ≈ 45 min, $100k ≈ 2 h,
+   $1M ≈ 3.5–4.5 h of active play. Verified with a bot simulation (`npm run sim`).
 
-## Screens (bottom tab bar, thumb reachable)
+## Screens (bottom tab bar)
 
 | Tab | Purpose |
 | --- | --- |
-| **Shop** | Buy packs and booster boxes for unlocked sets. Shows odds. Daily free pack. |
-| **Rip** | Your unopened packs. Tap one to open it. "Open all" quick mode. |
-| **Binder** | Collection by set, completion %, filters (rarity, variant, graded), card detail. |
-| **Market** | Sell (instant to dealer or list for more), buy singles, watch prices, events news ticker, collector requests. |
-| **Grading** | Submit cards, track submissions, crack open slabs on return (reveal moment). |
+| **Shop** | Buy packs and booster boxes, buy set licenses, claim free packs, odds table. |
+| **Rip** | Unopened packs; open one, or "Open all" quick mode. |
+| **Binder** | Collection by set, completion and bounty, card detail (sell, grade, display, list). |
+| **Market** | Hype charts and news, active listings, collector requests, buy singles, bulk sell. |
+| **Grading** | Submit cards, track timers, crack open returned slabs. |
 
-Header: cash, net worth, level/XP bar, menu button (Upgrades, Display Case,
-Achievements, Stats, Settings).
+Header: cash, net worth, menu (Upgrades, Display Case, Achievements, Stats,
+Settings).
 
-## Cards
+## Sets & licenses
 
-### Sets (unlock by player level)
+| Set | Theme | Pack | License |
+| --- | --- | --- | --- |
+| Iron Horses | Steam | $5 | free |
+| Diesel Dynasty | Diesel | $25 | $400 |
+| Electric Avenue | Electric | $120 | $2,500 |
+| Bullet Dreams | High-speed | $600 | $15,000 |
+| Maglev Futures | Maglev & future | $3,000 | $80,000 |
 
-| Set | Theme | Pack price | Cards | Unlock |
-| --- | --- | --- | --- | --- |
-| Iron Horses | Steam era | $4 | 24 | Lv 1 |
-| Diesel Dynasty | Diesel workhorses | $9 | 24 | Lv 3 |
-| Electric Avenue | Electric & commuter | $20 | 24 | Lv 6 |
-| Bullet Dreams | High-speed rail | $45 | 24 | Lv 10 |
-| Maglev Futures | Prototype & future | $120 | 24 | Lv 15 |
+Booster box = 12 packs at 8% off.
 
-Each set: 12 Common, 6 Uncommon, 3 Rare, 2 Super Rare, 1 Ultra Rare (the
-chase card). Plus one **Secret Rare** (#25/24) per set.
+Each set has 24 cards: 12 Common, 5 Uncommon, 3 Rare, 2 Super Rare, 2 Ultra
+Rare, plus one **Secret Rare** (#25/24). Every card is a real locomotive (or a
+famous concept), with a fact on the back.
 
-### Pack contents (5 cards)
+### Pack (5 cards)
 
-- Slots 1–3: Common (5% upgrade to Uncommon)
-- Slot 4: Uncommon (reverse-holo eligible)
-- Slot 5 "hit slot": Rare 72%, Super Rare 20%, Ultra Rare 6.5%, Secret 1.5%
+- Slots 1–3: Common (6% chance to upgrade to Uncommon).
+- Slot 4: Uncommon.
+- Slot 5 (hit): Rare 73.75%, Super Rare 22%, Ultra Rare 3.5%, Secret 0.75%.
+- **Pity:** an Ultra Rare or better is guaranteed within 40 packs of a set.
+- **God pack:** 1 in 500 packs, every card is SR or better.
+- **First session:** your third pack ever has a guaranteed Super Rare.
+- **1st Edition print run:** the first 30 packs you open of each set are
+  1st Edition (shown on a counter in the Shop). Cards in them carry a 1st
+  stamp worth ×1.5.
 
-### Varieties (rolled per card, multiply value)
+### Varieties (one per card)
 
-| Variety | Chance | Multiplier |
+| Variety | Chance | Value |
 | --- | --- | --- |
 | Standard | rest | ×1 |
-| Reverse Holo | 15% (slot 4 & commons) | ×2.5 |
-| Holo | 30% of hit slot rares | ×2 |
-| Full Art | 8% of Super Rare+ | ×3 |
-| Gold Rush | 0.8% any card | ×12 |
-| Misprint (error card) | 0.25% any card | ×20 |
+| Holo | 12% | ×2 |
+| Full Art | 15% of SR+ | ×3 |
+| Gold | 0.6% | ×10 |
+| Misprint | 0.2% | ×15 |
 
-### Editions
+## Value
 
-- **1st Edition** stamp: 8% of cards while a set is "in its first print run",
-  ×3 value. Sets leave first print after the player opens N packs of it or
-  after a game-time window. Shown as a gold "1st" stamp.
-- **Serial-numbered** /99: only on Ultra/Secret rares, 5% of those, ×4.
-- Unlimited: default.
+`value = base × variety × edition × grade × hype × demand`
 
-### Condition & grading
+- `base`: rarity × pack price × per-card popularity (0.8–1.25).
+- `hype`: per-set index in [0.6, 1.7], mean-reverting walk, ticks every 60 s.
+- `demand`: per-card, drops 4% each time you sell a copy, recovers 1%/tick;
+  rises 4% each time you buy a single.
 
-Each pulled card has a hidden condition score 1.0–10.0 (skewed high; packs are
-fresh but not perfect). Players see four **inspection hints** (Centering,
-Corners, Edges, Surface) with fuzzy words ("Sharp", "Slight wear") that
-correlate with the true score.
+### Grading
 
-Grading companies:
+Every card has a hidden true grade, drawn from: 10 (3%), 9.5 (10%), 9 (25%),
+8 (35%), 7 (17%), 6 or less (10%). The player sees an **estimate range**
+("Est. 8.5–9.5") from a noisy reading, which the Loupe upgrade sharpens.
 
-| Service | Cost | Time | Accuracy | Notes |
-| --- | --- | --- | --- | --- |
-| Rusty Rails Grading | $5 | 2 min | noisy | cheap, lower multipliers |
-| Platinum Grade | $25 | 5 min | accurate | standard |
-| Golden Spike Authority | $100 | 10 min | precise | top multipliers, Lv 8 |
+| Grade | 10 | 9.5 | 9 | 8 | 7 | ≤6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mult | ×5 | ×2.5 | ×1.6 | ×1.1 | ×0.85 | ×0.6 |
 
-Grade multipliers (Platinum): 10 ×8, 9.5 ×4, 9 ×2.5, 8 ×1.5, 7 ×1.1,
-≤6 ×0.7. Rusty Rails ×0.6 of those; Golden Spike ×1.4. Express option (+100%
-cost, half time).
+Services:
 
-Returning slabs get a reveal: the grade label flips in.
+- **Platinum Grade:** fee $3 + 4% of raw value, 30 s.
+- **Golden Spike Authority:** fee $25 + 10% of raw value, 90 s, slabs worth ×1.3
+  more. Unlocks with the Electric license.
 
-## Economy
+Grading is worth it only on cards with a good estimate. Blind grading averages
+about ×1.3 minus fees.
 
-### Prices
+## Selling & buying
 
-`price = base(rarity, card popularity) × variety × edition × grade × trend`
+- **Dealer (instant):** 55% of value. Haggling upgrade adds 4% per level, up to 75%.
+- **Listing:** you choose a price, from 80% to 150% of value. Sale time scales
+  with price/value (at value: 10–45 s; 130%+: rare). 8% fee. 3 slots to start,
+  upgradeable.
+- **Bulk:** sell all Standard commons and uncommons in one tap at dealer rate.
+- **Singles:** the market stocks a few cards per set at 105% of value (stock
+  rotates every few minutes). Useful for completing sets and filling requests.
+- **Sealed:** packs and boxes resell at 85% of current shop price. Shop price =
+  base × hype, so you profit when buying in a dip and selling in a boom.
 
-- `trend` per card: mean-reverting random walk (±3%/tick), ticks every 30 s
-  real time.
-- **Market events** (one active at a time, 3–6 min): "Steam Nostalgia Week
-  (+40% steam cards)", "Influencer opened a Maglev box (+25% Maglev)",
-  "Collector dumps Diesel collection (−30% Diesel)", "Grading backlog (grading
-  times ×2)", "Holo Craze (holos +50%)".
-- Supply pressure: cards the player sells a lot of drop a little in price
-  (prevents infinite flipping of one card).
+## Other income
 
-### Selling
+- **Collector requests:** 3 open at a time, rotating every ~6 min. Each asks for
+  a specific card, sometimes with a minimum grade or variety, and pays 150–220%
+  of its value plus a cash tip.
+- **Display case:** 2 slots, upgradeable to 8. Each displayed card earns 2% of
+  its value per hour, capped per slot at the cap for your highest license
+  ($20 / $100 / $500 / $2,500 / $12,000 per hour). Offline earnings are capped at 2 h.
+- **Set bounties:** owning all 24 base cards of a set pays 3 × pack price × 24
+  once.
+- **Free pack:** one Iron Horses pack every 15 min, stockpiling up to 3.
+  "On the house" starter pack whenever cash plus assets is under $5.
+- **Achievements** pay small cash rewards.
 
-- **Dealer (instant):** 55% of market (+5% per Haggling upgrade, max 80%).
-- **Marketplace listing:** set your price; 8% fee. Sells after a delay driven
-  by price ÷ market (at market: 30–120 s; 20% over: rarely; under: fast).
-  Limited listing slots (upgradeable).
-- **Bulk:** commons/uncommons sold by the lot at fixed bulk rate.
+## Market events
 
-### Buying
+One at a time, announced 60 s ahead, lasting 3–5 min:
+- Set boom or crash (hype ±30–50%)
+- Holo Craze (Holo variety ×1.5)
+- Grading Rush (grading fees halved)
+- Collector Convention (request payouts +50%, more requests)
+- Dealer Sale (box discount 20%)
 
-- Packs & booster boxes (box = 20 packs at 10% discount) in the Shop.
-- Singles from the marketplace at ~110% market — lets players snipe set
-  completion or speculate on trending cards.
+## Upgrades
 
-### Other income
+Haggling, Listing Slots, Display Slots, Loupe (sharper estimates), Grading
+Slots (concurrent submissions, starts at 2), Auto-Bulk (auto-sells Standard
+commons after each rip).
 
-- **Collector Requests:** NPC collectors post requests ("Want: any Holo Big
-  Boy, grade 8+, pays $240"). Rotate every few minutes. Pay a premium over
-  market.
-- **Display Case:** slots that show off cards; each displayed card earns
-  0.2% of its value per minute (passive, also offline up to 4 h).
-- **Set Completion:** completing a set (all 24 base cards in any variety)
-  pays a bounty and gives +XP, permanent +5% dealer price for that set.
-- **Sealed speculation:** sealed booster boxes appreciate once a set goes out
-  of print (sets rotate out of the shop at higher levels — packs then only
-  available as sealed product on the marketplace at rising prices).
-- **Daily free pack** and achievement cash rewards.
+## Net worth
 
-### Anti-softlock
-
-Free pack every 4 hours (stockpiles up to 2). Bulk sales always pay something.
-
-### Expected value targets
-
-- Pack EV at dealer price: ~60–70% of pack price (losing).
-- Pack EV at full market: ~95–110% (break-even if you list everything).
-- Skill (grading the right cards, listing smartly, requests, events) turns the
-  edge positive: target ~1.3–1.6× return on good play.
-- Higher-tier sets have higher variance and slightly better EV.
-
-## Progression
-
-XP from opening packs, selling, grading, requests. Levels unlock sets,
-grading services, upgrades.
-
-Upgrades (cash sinks):
-- Haggling (dealer %), Listing Slots, Display Case Slots, Grading Express
-  discount, Auto-Bulk (auto sells commons after a rip), Lucky Sleeves (small
-  boost to hit-slot odds, capped).
-
-Milestones: $1k, $10k, $100k, $1M net worth with celebrations.
-
-## Pack opening flow
-
-1. Pack fills screen. Drag along the top seam (or tap) to tear. Foil crinkle
-   sound + vibration.
-2. Cards slide out face-down in a stack. Tap to flip the top card. Commons
-   first, hit card last.
-3. The hit card's back glows the rarity colour before flipping (rare blue,
-   super purple, ultra gold, secret rainbow). Ultra/secret shake and need a
-   hold-to-reveal.
-4. Flip: 3D rotate, rarity burst particles, value pops in. "NEW" badge on
-   first copy. Holo/gold cards shimmer with finger movement/device tilt.
-5. Summary: grid of pulls, pack value vs cost, quick actions (Sell commons,
-   Open next).
+Cash + dealer value of cards + resale value of sealed product. Valuing at
+dealer price prevents fake wealth from price spikes.
 
 ## Tech
 
-- Vite + React + TypeScript, Zustand state, localStorage saves with
-  versioning and migration.
-- Engine (pure TS, unit tested): RNG, pack generation, pricing, market sim,
-  grading, offline catch-up.
-- All art procedural SVG (no external assets). WebAudio synthesized SFX.
-- PWA (installable, offline). GitHub Pages deploy via Actions.
+Vite + React + TypeScript, Zustand, localStorage saves (versioned). Pure TS
+engine with Vitest tests and a bot simulation for balance. Procedural SVG art,
+WebAudio SFX, vibration haptics. PWA, GitHub Pages deploy.
