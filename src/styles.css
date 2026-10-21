@@ -520,3 +520,11 @@ b { font-weight: 700; }
 @media (min-width: 521px) {
   .app { border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
 }
+
+/* victory */
+.victory { position: fixed; inset: 0; z-index: 140; background: radial-gradient(circle at 50% 30%, rgba(246,207,116,0.35), rgba(5,4,3,0.95) 60%); display: grid; place-items: center; padding: 20px; animation: fadeOnly 0.4s; }
+.victory-card { width: 100%; max-width: 380px; background: linear-gradient(180deg, #2b2114, #1a1410); border: 1px solid var(--brass); border-radius: 22px; padding: 24px 20px; display: flex; flex-direction: column; gap: 12px; text-align: center; box-shadow: 0 0 60px rgba(246,207,116,0.35); animation: pop 0.6s cubic-bezier(.2,1.5,.5,1); }
+.victory-crown { font-size: 54px; animation: packFloat 2.4s ease-in-out infinite; }
+.victory h2 { font-size: 34px; letter-spacing: 0.12em; background: linear-gradient(90deg, #fff3c4, #ffc93c, #fff3c4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.victory p { margin: 0; }
+.victory .stat-rows { text-align: left; }

@@ -172,7 +172,7 @@ export function eventActive(s: GameState, kind: EventKind, set?: SetId): boolean
 }
 
 export function baseValue(def: CardDef): number {
-  return SET_BY_ID[def.set].packPrice * C.RARITY_VALUE[def.rarity] * def.pop;
+  return SET_BY_ID[def.set].packPrice * C.RARITY_VALUE[def.rarity] * def.pop * C.SET_VALUE_BOOST[def.set];
 }
 
 export function itemMult(inst: Pick<CardInst, 'variety' | 'first' | 'grade' | 'grader'>, holoCraze = false): number {

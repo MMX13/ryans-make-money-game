@@ -14,6 +14,9 @@ export const RARITY_VALUE: Record<Rarity, number> = {
   SEC: 13.5,
 };
 
+/** Higher tiers return a little more, so moving up feels worth the risk. */
+export const SET_VALUE_BOOST: Record<SetId, number> = { iron: 1, diesel: 1.04, electric: 1.08, bullet: 1.12, maglev: 1.16 };
+
 export const RARITY_NAME: Record<Rarity, string> = {
   C: 'Common', U: 'Uncommon', R: 'Rare', SR: 'Super Rare', UR: 'Ultra Rare', SEC: 'Secret Rare',
 };

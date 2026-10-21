@@ -33,7 +33,8 @@ function bot(seed: number, opts: BotOpts) {
   const s = G.newGame(0, seed);
   let t = 0;
   const marks: Record<number, number> = {};
-  const spendTime = (sec: number) => { t += sec * 1000; G.advance(s, t); };
+  const H = process.env.HUMAN ? 2 : 1;
+  const spendTime = (sec: number) => { t += sec * 1000 * H; G.advance(s, t); };
   const sets = SETS.map((x) => x.id);
   const reachedAt = (m: number) => marks[m];
   let lastLog = 0;
@@ -67,7 +68,7 @@ function bot(seed: number, opts: BotOpts) {
       spendTime(2);
     }
     // open
-    for (const id of sets) while (s.packs[id] > 0) { G.openPack(s, id); spendTime(2.5); }
+    for (const id of sets) { const n = s.packs[id]; while (s.packs[id] > 0) { G.openPack(s, id); spendTime(n >= 5 ? 1.2 : 6); } }
     // bulk
     const bulk = G.bulkCandidates(s);
     if (bulk.length) { G.sellCards(s, bulk, true); spendTime(1); }
@@ -103,8 +104,8 @@ function bot(seed: number, opts: BotOpts) {
       toDealer.push(c);
     }
     if (toDealer.length) { G.sellCards(s, toDealer); spendTime(1); }
-    // if stuck waiting on listings with no cash, just wait
-    spendTime(1);
+    // thinking / navigating overhead each loop
+    spendTime(2);
     const nw = G.netWorth(s);
     for (const m of [1e3, 1e4, 1e5, 1e6]) if (nw >= m && !marks[m]) marks[m] = t;
     if (marks[1e6]) break;

@@ -57,6 +57,7 @@ function SheetView({ sheet }: { sheet: Sheet }) {
     case 'help': return <HelpSheet />;
     case 'odds': return <OddsSheet set={sheet.set} />;
     case 'away': return <AwaySheet lines={sheet.lines} />;
+    case 'victory': return <Victory />;
     default: return null;
   }
 }
@@ -123,6 +124,7 @@ function Toasts() {
       if (n.kind === 'sale' || n.kind === 'request') sfx.coin();
       if (n.kind === 'achievement') sfx.bigCoin();
       if (n.kind === 'milestone') { sfx.fanfare(); buzz([50, 50, 100]); }
+      if (n.kind === 'milestone' && n.text.startsWith('RAIL BARON')) setTimeout(() => useStore.getState().push({ kind: 'victory' }), 600);
       const ttl = n.kind === 'milestone' ? 5000 : 3200;
       setTimeout(() => setVisible((v) => v.filter((x) => x.id !== n.id)), ttl);
     }
@@ -170,6 +172,30 @@ function Coach() {
       <div className="coach-btns">
         {go && <button className="btn tiny primary" onClick={() => { setTab(go!); if (step >= 2) next(); }}>Show me</button>}
         <button className="btn tiny ghost" onClick={next}>{step >= 4 ? 'Let’s go!' : 'Got it'}</button>
+      </div>
+    </div>
+  );
+}
+
+function Victory() {
+  const game = useStore((s) => s.game);
+  const pop = useStore((s) => s.pop);
+  const mins = Math.floor(game.stats.playMs / 60000);
+  return (
+    <div className="victory" onClick={pop}>
+      <div className="victory-card" onClick={(e) => e.stopPropagation()}>
+        <div className="victory-crown">🚂</div>
+        <h2>RAIL BARON</h2>
+        <p>You built a <b>$1,000,000</b> train card empire.</p>
+        <div className="stat-rows">
+          <div><span className="muted">Play time</span><b>{Math.floor(mins / 60)}h {mins % 60}m</b></div>
+          <div><span className="muted">Packs opened</span><b>{game.stats.packsOpened.toLocaleString()}</b></div>
+          <div><span className="muted">Cards graded</span><b>{game.stats.graded}</b></div>
+          <div><span className="muted">Biggest sale</span><b>{G.fmtMoney(game.stats.biggestSale)}</b></div>
+          <div><span className="muted">Sets completed</span><b>{game.bounties.length}/5</b></div>
+        </div>
+        <p className="muted small">The rails go on forever. Keep collecting: can you complete every set?</p>
+        <button className="btn gold wide" onClick={pop}>Keep playing</button>
       </div>
     </div>
   );

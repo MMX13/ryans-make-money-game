@@ -18,6 +18,7 @@ export type Sheet =
   | { kind: 'pickDisplay'; slot: number }
   | { kind: 'fulfil'; reqId: number }
   | { kind: 'away'; lines: string[] }
+  | { kind: 'victory' }
   | null;
 
 export interface Opening { set: G.PackResult['set']; results: G.PackResult[]; quick: boolean }
@@ -70,6 +71,14 @@ function load(): { game: G.GameState; away: string[] | null } {
   return { game: G.newGame(now), away: null };
 }
 
+/** Cards are flat objects, so copying them shallowly is a full copy and much cheaper than structuredClone. */
+function cloneGame(g: G.GameState): G.GameState {
+  const { cards, ...rest } = g;
+  const copy = structuredClone(rest) as G.GameState;
+  copy.cards = cards.map((c) => ({ ...c }));
+  return copy;
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 export function saveNow(game: G.GameState) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { /* storage full or blocked */ }
@@ -89,7 +98,7 @@ export const useStore = create<Store>((set, get) => ({
   opening: null,
   binderSet: 'iron',
   act: (fn) => {
-    const copy = structuredClone(get().game);
+    const copy = cloneGame(get().game);
     copy.now = Math.max(copy.now, Date.now() - 1);
     const out = fn(copy);
     set({ game: copy });
