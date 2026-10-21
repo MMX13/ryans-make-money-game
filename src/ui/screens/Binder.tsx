@@ -21,10 +21,12 @@ export function Binder() {
   const [view, setView] = useState<View>('set');
   const [filter, setFilter] = useState<Filter>('all');
   const rev = useStore((s) => s.rev);
-  const { bulk, bulkValue } = useMemo(() => {
+  const { bulk, bulkValue, lot, lotValue } = useMemo(() => {
     const bulk = G.bulkCandidates(game);
-    return { bulk, bulkValue: bulk.reduce((a, c) => a + G.dealerPrice(game, c), 0) };
+    const lot = G.lotCandidates(game);
+    return { bulk, bulkValue: bulk.reduce((a, c) => a + G.dealerPrice(game, c), 0), lot, lotValue: G.lotPrice(game, lot) };
   }, [rev, game.lastMarketTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const slotFree = G.usedListingSlots(game) < G.listingSlots(game);
 
   return (
     <div className="screen binder">
@@ -35,6 +37,11 @@ export function Binder() {
       {bulk.length > 0 && (
         <button className="btn wide bulk-btn" onClick={() => { act((g) => G.sellCards(g, G.bulkCandidates(g), true)); sfx.coin(); buzz(15); }}>
           Bulk-sell {bulk.length} duplicate commons · <Money v={bulkValue} />
+        </button>
+      )}
+      {lot.length >= 2 && (
+        <button className="btn wide lot-btn" disabled={!slotFree} onClick={() => { if (act((g) => G.listLot(g))) { sfx.click(); buzz(10); } }}>
+          {slotFree ? <>List {lot.length} spare Rares &amp; holos as a lot · <Money v={lotValue} /></> : 'Lot ready, but all listing slots are busy'}
         </button>
       )}
       {view === 'set' ? <SetView setId={setId} onSet={setBinderSet} /> : <AllView filter={filter} setFilter={setFilter} />}

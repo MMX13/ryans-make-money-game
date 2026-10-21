@@ -44,7 +44,7 @@ function Scene({ spec, id }: { spec: ArtSpec; id: string }) {
   const night = spec.scene === 'night' || spec.scene === 'space';
   els.push(<circle key="sun" cx={sunX} cy={30 + r() * 15} r={night ? 9 : 14} fill={night ? '#f4f1de' : '#ffe9a8'} opacity={night ? 0.9 : 0.85} />);
   if (night) {
-    for (let i = 0; i < 26; i++) els.push(<circle key={'st' + i} cx={r() * 200} cy={r() * 70} r={r() * 0.9 + 0.3} fill="#fff" opacity={0.4 + r() * 0.6} />);
+    for (let i = 0; i < 40; i++) els.push(<circle key={'st' + i} cx={r() * 200} cy={r() * 210 - 140} r={r() * 0.9 + 0.3} fill="#fff" opacity={0.4 + r() * 0.6} />);
   }
   switch (spec.scene) {
     case 'mountains':
@@ -108,7 +108,7 @@ function Scene({ spec, id }: { spec: ArtSpec; id: string }) {
           <stop offset="1" stopColor={skyBottom} />
         </linearGradient>
       </defs>
-      <rect width={200} height={140} fill={`url(#${id}sky)`} />
+      <rect y={-150} width={200} height={290} fill={`url(#${id}sky)`} />
       {els}
     </g>
   );
@@ -563,7 +563,7 @@ function UrbanMaglev({ s }: { s: ArtSpec }) {
   );
 }
 
-export const TrainArt = memo(function TrainArt({ spec, className }: { spec: ArtSpec; className?: string }) {
+export const TrainArt = memo(function TrainArt({ spec, className, tall }: { spec: ArtSpec; className?: string; tall?: boolean }) {
   const id = 'a' + spec.seed.toString(36);
   let loco: JSX.Element;
   switch (spec.loco) {
@@ -586,7 +586,7 @@ export const TrainArt = memo(function TrainArt({ spec, className }: { spec: ArtS
     case 'hyperloop': loco = <Maglev s={spec} hyper />; break;
   }
   return (
-    <svg viewBox="0 0 200 140" className={className} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <svg viewBox={tall ? '0 -139 200 279' : '0 0 200 140'} className={className} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <Scene spec={spec} id={id} />
       <TierFx spec={spec} />
       <Track kind={spec.loco} />

@@ -159,7 +159,7 @@ export function StatsSheet() {
     ['Cards pulled', st.cardsPulled.toLocaleString()],
     ['Cards graded', `${st.graded} (${st.tens} perfect 10s)`],
     ['Requests completed', String(st.requests)],
-    ['Biggest single sale', G.fmtMoney(st.biggestSale)],
+    ['Biggest single sale', st.biggestSale ? G.fmtMoney(st.biggestSale) : '—'],
   ];
   const ledger = Object.entries(st.ledger).sort((a, b) => b[1] - a[1]);
   return (
@@ -271,9 +271,20 @@ export function OddsSheet({ set }: { set: SetId }) {
 }
 
 export function AwaySheet({ lines }: { lines: string[] }) {
+  const game = useStore((s) => s.game);
+  const setTab = useStore((s) => s.setTab);
+  const ready = game.grading.some((g) => g.doneAt <= game.now);
+  const pending = game.listings.length + game.lots.length;
   return (
     <Sheet title="Welcome back!">
-      <ul className="away">{lines.map((l) => <li key={l}>{l}</li>)}</ul>
+      <ul className="away">
+        {lines.map((l) => <li key={l}>{l}</li>)}
+        {pending > 0 && <li>{pending} listing{pending > 1 ? 's are' : ' is'} still waiting for a buyer</li>}
+      </ul>
+      <div className="row">
+        {ready && <button className="btn gold" onClick={() => setTab('grading')}>Crack slabs</button>}
+        <button className="btn primary" onClick={() => setTab(game.freePacks > 0 ? 'shop' : 'rip')}>Let's go</button>
+      </div>
       <p className="muted small">Progress while away is capped at 2 hours.</p>
     </Sheet>
   );

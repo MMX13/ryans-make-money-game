@@ -66,11 +66,28 @@ export function Market() {
         })}
       </div>
 
-      <h4 className="section">My listings <small className="muted">· {game.listings.length}/{G.listingSlots(game)} slots</small></h4>
-      {game.listings.length === 0 ? (
+      <h4 className="section">My listings <small className="muted">· {G.usedListingSlots(game)}/{G.listingSlots(game)} slots</small></h4>
+      {G.usedListingSlots(game) === 0 ? (
         <p className="muted small">List cards from your Binder to sell them for more than the dealer pays.</p>
       ) : (
         <div className="listings">
+          {game.lots.map((lot) => {
+            const first = game.cards.find((c) => c.uid === lot.uids[0]);
+            return (
+              <div key={lot.id} className="listing">
+                {first ? <CardFace look={first} size="xs" /> : null}
+                <div className="grow">
+                  <b>Lot of {lot.uids.length} cards</b>
+                  <small className="muted">Sells to a dealer network, usually within a minute</small>
+                  <Progress value={Math.min(0.95, (now - lot.at) / 45000)} className="thin" />
+                </div>
+                <div className="right">
+                  <Money v={lot.price} />
+                  <button className="btn tiny ghost" onClick={() => act((g) => G.cancelLot(g, lot.id))}>Cancel</button>
+                </div>
+              </div>
+            );
+          })}
           {game.listings.map((l) => {
             const inst = game.cards.find((c) => c.uid === l.uid);
             if (!inst) return null;

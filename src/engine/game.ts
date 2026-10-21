@@ -24,6 +24,8 @@ export interface CardInst {
 }
 
 export interface Listing { uid: number; price: number; at: number }
+/** Several cards sold together in one listing slot at a fixed small discount. */
+export interface Lot { id: number; uids: number[]; price: number; at: number }
 export interface Submission { uid: number; grader: GraderId; doneAt: number; fee: number }
 export interface Request {
   id: number;
@@ -86,6 +88,7 @@ export interface GameState {
   event: MarketEvent | null;
   nextEventAt: number;
   listings: Listing[];
+  lots: Lot[];
   grading: Submission[];
   requests: Request[];
   singles: Single[];
@@ -132,6 +135,7 @@ export function newGame(now: number, seed = (Math.random() * 2 ** 32) >>> 0): Ga
     event: null,
     nextEventAt: now + 8 * 60_000,
     listings: [],
+    lots: [],
     grading: [],
     requests: [],
     singles: [],
@@ -240,7 +244,10 @@ export function sealedResale(s: GameState, set: SetId): number {
 export function netWorth(s: GameState): number {
   let w = s.cash;
   for (const c of s.cards) w += Math.max(dealerPrice(s, c), value(s, c) * C.NET_WORTH_CARD_RATE);
-  for (const set of ALL_SETS) w += s.packs[set] * sealedResale(s, set);
+  for (const set of ALL_SETS) {
+    w += Math.max(s.packs[set] * sealedResale(s, set), (s.packCost[set] ?? 0) + (s.freeHeld[set] ?? 0) * sealedResale(s, set));
+    if (s.licenses.includes(set)) w += SET_BY_ID[set].license;
+  }
   return round2(w);
 }
 
@@ -283,6 +290,7 @@ export function gradingFee(s: GameState, inst: CardInst, grader: GraderId): numb
 }
 
 export function listingSlots(s: GameState) { return 3 + s.upgrades.listings; }
+export function usedListingSlots(s: GameState) { return s.listings.length + s.lots.length; }
 export function gradingSlots(s: GameState) { return 2 + s.upgrades.gradeSlots; }
 export function displaySlots(s: GameState) { return 2 + s.upgrades.display; }
 
@@ -533,10 +541,46 @@ export function bulkCandidates(s: GameState, onlyUids?: number[]): CardInst[] {
 
 export function listCard(s: GameState, uid: number, price: number): boolean {
   const inst = s.cards.find((c) => c.uid === uid);
-  if (!inst || inst.status !== 'binder' || s.listings.length >= listingSlots(s) || !Number.isFinite(price) || price <= 0) return false;
+  if (!inst || inst.status !== 'binder' || usedListingSlots(s) >= listingSlots(s) || !Number.isFinite(price) || price <= 0) return false;
   inst.status = 'listed';
   s.listings.push({ uid, price: round2(Math.max(0.01, price)), at: s.now });
   return true;
+}
+
+/** Duplicates worth selling as a lot: keeps the best copy of each card, skips kept, graded and chase cards. */
+export function lotCandidates(s: GameState): CardInst[] {
+  const best = new Map<string, CardInst>();
+  const pool = s.cards.filter((c) => c.status === 'binder');
+  for (const c of pool) {
+    const b = best.get(c.cardId);
+    if (!b || value(s, c) > value(s, b)) best.set(c.cardId, c);
+  }
+  const bulk = new Set(bulkCandidates(s).map((c) => c.uid));
+  return pool
+    .filter((c) => best.get(c.cardId) !== c && !c.fav && c.grade === undefined && !bulk.has(c.uid))
+    .filter((c) => { const r = card(c).rarity; return r !== 'UR' && r !== 'SEC'; })
+    .sort((a, b) => value(s, b) - value(s, a))
+    .slice(0, C.LOT_MAX);
+}
+
+export function lotPrice(s: GameState, insts: CardInst[]): number {
+  return round2(insts.reduce((a, c) => a + value(s, c), 0) * C.LOT_PRICE);
+}
+
+export function listLot(s: GameState): Lot | null {
+  const cards = lotCandidates(s);
+  if (cards.length < 2 || usedListingSlots(s) >= listingSlots(s)) return null;
+  const lot: Lot = { id: s.nextId++, uids: cards.map((c) => c.uid), price: lotPrice(s, cards), at: s.now };
+  for (const c of cards) c.status = 'listed';
+  s.lots.push(lot);
+  return lot;
+}
+
+export function cancelLot(s: GameState, id: number) {
+  const lot = s.lots.find((l) => l.id === id);
+  if (!lot) return;
+  s.lots = s.lots.filter((l) => l !== lot);
+  for (const c of s.cards) if (lot.uids.includes(c.uid)) c.status = 'binder';
 }
 
 export function cancelListing(s: GameState, uid: number) {
@@ -621,7 +665,7 @@ function makeRequest(s: GameState, r: Rng): Request {
   // favour the newest set a little so requests stay relevant
   const tierOf = (set: SetId) => s.licenses.indexOf(set);
   const topTier = s.licenses.length - 1;
-  const setWeight = (set: SetId) => [1, 0.5, 0.15, 0.05, 0.02][topTier - tierOf(set)] ?? 0.02;
+  const setWeight = (set: SetId) => [1, 0.5][topTier - tierOf(set)] ?? 0;
   const def = r.weighted(pool.map((c) => [c, weights[c.rarity] * setWeight(c.set)] as [CardDef, number]));
   const needVariety = def.rarity !== 'C' && r.chance(0.25);
   // only ask for graded copies of cards worth grading
@@ -966,6 +1010,20 @@ function stepContinuous(s: GameState, r: Rng, dt: number) {
       notify(s, 'sale', `Sold ${card(inst).name}`, net);
     }
   }
+  // lots sell at a fixed pace
+  for (const lot of [...s.lots]) {
+    if (s.now - lot.at < 3000) continue;
+    if (r.chance(1 - Math.exp(-dt / C.LOT_SECONDS))) {
+      s.lots = s.lots.filter((x) => x !== lot);
+      const ids = new Set(lot.uids);
+      for (const c of s.cards) if (ids.has(c.uid)) pressure(s, c.cardId, -C.DEMAND_SELL);
+      s.cards = s.cards.filter((c) => !ids.has(c.uid));
+      const net = round2(lot.price * (1 - C.LISTING_FEE));
+      earn(s, net, 'listings');
+      s.stats.sales += lot.uids.length;
+      notify(s, 'sale', `Sold a lot of ${lot.uids.length} cards`, net);
+    }
+  }
   // grading notices
   for (const g of s.grading) {
     if (g.doneAt <= s.now && !(g as any).told) {
@@ -1012,6 +1070,7 @@ export function migrate(raw: any): GameState | null {
   s.sealedDemand ??= zeroBySet(1);
   s.packCost ??= zeroBySet(0);
   s.freeHeld ??= zeroBySet(0);
+  s.lots ??= [];
   if (!s.tutorialBits) {
     // older saves stored the tutorial as a step counter
     s.tutorial = s.tutorial >= 5 ? 0b11111 : (1 << s.tutorial) - 1;

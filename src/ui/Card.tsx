@@ -84,7 +84,7 @@ export const CardFace = memo(function CardFace({ look, size = 'md', showFact = f
     <div className={cls} style={style}>
       <div className="card-frame">
         <div className="card-art">
-          <TrainArt spec={spec} className="art-svg" />
+          <TrainArt spec={spec} className="art-svg" tall={v === 'full'} />
           {v === 'misprint' && <TrainArt spec={spec} className="art-svg ghost" />}
         </div>
         <div className="card-top">

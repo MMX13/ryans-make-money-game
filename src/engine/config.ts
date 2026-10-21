@@ -73,6 +73,10 @@ export const GRADERS: Record<GraderId, { name: string; short: string; flat: numb
 export const DEALER_BASE = 0.55;
 export const DEALER_PER_HAGGLE = 0.04;
 export const LISTING_FEE = 0.08;
+/** Lots: up to this many cards, priced at this share of their value, selling in about this many seconds. */
+export const LOT_MAX = 30;
+export const LOT_PRICE = 0.85;
+export const LOT_SECONDS = 45;
 /** Net worth counts cards at this share of market value (about what listing nets after fees and waiting). */
 export const NET_WORTH_CARD_RATE = 0.8;
 export const LISTING_BASE_SECONDS = 22;
@@ -111,7 +115,7 @@ export const UPGRADES: Record<UpgradeId, { name: string; desc: (lvl: number) => 
   display: { name: 'Display Case', icon: '🖼️', desc: (l) => `${2 + l} display slots`, costs: [200, 1200, 6000, 25000, 60000, 120000] },
   loupe: { name: 'Jeweler\'s Loupe', icon: '🔍', desc: (l) => ['Rough condition estimates', 'Better condition estimates', 'Sharp condition estimates', 'Near-perfect condition estimates'][l], costs: [300, 4000, 40000] },
   gradeSlots: { name: 'Grading Slots', icon: '📦', desc: (l) => `${2 + l} cards at the grader at once`, costs: [250, 2000, 12000, 60000] },
-  autoBulk: { name: 'Auto-Bulk', icon: '🧹', desc: (l) => (l ? 'On: duplicate Standard commons are sold as you rip' : 'Sells duplicate Standard commons and uncommons as you rip (always keeps one of each)'), costs: [500] },
+  autoBulk: { name: 'Auto-Bulk', icon: '🧹', desc: (l) => (l ? 'On: duplicate Standard commons and uncommons are sold as you rip' : 'Sells duplicate Standard commons and uncommons as you rip (always keeps one of each)'), costs: [500] },
 };
 export const LOUPE_SIGMA = [0.9, 0.6, 0.35, 0.15];
 

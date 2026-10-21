@@ -100,7 +100,7 @@ export function CardSheet({ uid }: { uid: number }) {
       )}
 
       {inst.status === 'binder' && mode === 'list' && (
-        <ListPanel v={v} ratio={ratio} setRatio={setRatio} slotsFree={G.listingSlots(game) - game.listings.length}
+        <ListPanel v={v} ratio={ratio} setRatio={setRatio} slotsFree={G.listingSlots(game) - G.usedListingSlots(game)}
           onBack={() => setMode('main')}
           onList={() => {
             if (act((g) => G.listCard(g, uid, v * ratio))) { sfx.click(); buzz(10); pop(); }
