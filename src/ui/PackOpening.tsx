@@ -96,8 +96,8 @@ function SingleOpening() {
 
   function tapCard() {
     if (phase !== 'reveal' || !cur) return;
-    // ignore the click that follows releasing a completed hold, and give big reveals a moment
-    if (performance.now() - justHeld.current < 900) return;
+    // the click that ends a press-and-hold is not a tap
+    if (justHeld.current) { justHeld.current = 0; return; }
     if (flipped) { advance(); return; }
     if (result.fakeFrom && isHit && !cracked) {
       setCracked(true);
@@ -111,6 +111,7 @@ function SingleOpening() {
 
   const holdStart = () => {
     if (!needsHold || holdRef.current) return;
+    justHeld.current = 1;
     sfx.chargeStart();
     const start = performance.now();
     const loop = () => {
@@ -118,7 +119,6 @@ function SingleOpening() {
       setCharge(p);
       if (p >= 1) {
         holdRef.current = null;
-        justHeld.current = performance.now();
         sfx.chargeStop();
         flip();
         return;
