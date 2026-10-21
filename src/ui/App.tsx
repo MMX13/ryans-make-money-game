@@ -129,7 +129,7 @@ function Toasts() {
       const ttl = n.kind === 'milestone' ? 5000 : 3200;
       setTimeout(() => setVisible((v) => v.filter((x) => x.id !== n.id)), ttl);
     }
-    if (notices.length) act((g) => { g.notices = g.notices.filter((x) => !seen.current.has(x.id)); });
+    if (notices.some((x) => seen.current.has(x.id))) act((g) => { g.notices = g.notices.filter((x) => !seen.current.has(x.id)); });
   }, [notices, opening]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={'toasts' + (opening ? ' over' : '')}>
