@@ -238,13 +238,35 @@ export function netWorth(s: GameState): number {
   return round2(w);
 }
 
-export function gradeEstimate(s: GameState, inst: Pick<CardInst, 'tg' | 'z'>): [number, number] {
+/**
+ * Honest odds of each grade given what the player can see. The visible reading
+ * is the true grade plus noise (smaller with a better loupe); this is the
+ * Bayesian posterior over the true grade given that reading.
+ */
+export function gradeOdds(s: GameState, inst: Pick<CardInst, 'tg' | 'z'>): [number, number][] {
   const sigma = C.LOUPE_SIGMA[s.upgrades.loupe];
-  const center = inst.tg + inst.z * sigma;
-  const half = Math.max(0.5, sigma * 0.9);
-  const lo = clamp(Math.round((center - half) * 2) / 2, 1, 10);
-  const hi = clamp(Math.round((center + half) * 2) / 2, 1, 10);
-  return [lo, Math.max(hi, lo)];
+  const reading = inst.tg + inst.z * sigma;
+  const w = C.GRADE_DIST.map(([g, p]) => [g, p * Math.exp(-((reading - g) ** 2) / (2 * sigma * sigma))] as [number, number]);
+  const total = w.reduce((a, [, x]) => a + x, 0) || 1;
+  return w.map(([g, x]) => [g, x / total]);
+}
+
+/** Expected grade multiplier (before grader bonus) given the visible condition. */
+export function expectedGradeMult(s: GameState, inst: Pick<CardInst, 'tg' | 'z'>): number {
+  return gradeOdds(s, inst).reduce((a, [g, p]) => a + p * C.gradeMult(g), 0);
+}
+
+/** The most likely grades, covering at least 80% of the odds. */
+export function gradeEstimate(s: GameState, inst: Pick<CardInst, 'tg' | 'z'>): [number, number] {
+  const odds = gradeOdds(s, inst).sort((a, b) => b[1] - a[1]);
+  let acc = 0;
+  const picked: number[] = [];
+  for (const [g, p] of odds) { picked.push(g); acc += p; if (acc >= 0.8) break; }
+  return [Math.min(...picked), Math.max(...picked)];
+}
+
+export function fmtEstimate(r: [number, number]): string {
+  return r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`;
 }
 
 export function gradingFee(s: GameState, inst: CardInst, grader: GraderId): number {
@@ -471,7 +493,7 @@ export function sellCards(s: GameState, insts: CardInst[], bulk = false): number
 
 export function isBulkable(c: CardInst): boolean {
   const r = card(c).rarity;
-  return (r === 'C' || r === 'U') && c.variety === 'std' && c.grade === undefined && !c.fav && !c.first && c.status === 'binder';
+  return (r === 'C' || r === 'U') && c.variety === 'std' && c.grade === undefined && !c.fav && c.status === 'binder';
 }
 
 /**
@@ -483,8 +505,9 @@ export function bulkCandidates(s: GameState, onlyUids?: number[]): CardInst[] {
   for (const c of s.cards) if (c.status === 'binder') copies.set(c.cardId, (copies.get(c.cardId) ?? 0) + 1);
   const only = onlyUids ? new Set(onlyUids) : null;
   const out: CardInst[] = [];
-  for (let i = s.cards.length - 1; i >= 0; i--) {
-    const c = s.cards[i];
+  // sell unlimited copies before 1st Editions, newest first
+  const order = s.cards.map((c, i) => [c, i] as [CardInst, number]).sort((a, b) => Number(a[0].first) - Number(b[0].first) || b[1] - a[1]);
+  for (const [c] of order) {
     if (only && !only.has(c.uid)) continue;
     if (!isBulkable(c)) continue;
     const n = copies.get(c.cardId)!;
@@ -581,8 +604,10 @@ function makeRequest(s: GameState, r: Rng): Request {
   const pool = unlockedCards(s);
   const weights: Record<Rarity, number> = { C: 1, U: 1.5, R: 3, SR: 2, UR: 0.6, SEC: 0.15 };
   // favour the newest set a little so requests stay relevant
-  const top = s.licenses[s.licenses.length - 1];
-  const def = r.weighted(pool.map((c) => [c, weights[c.rarity] * (c.set === top ? 2 : 1)] as [CardDef, number]));
+  const tierOf = (set: SetId) => s.licenses.indexOf(set);
+  const topTier = s.licenses.length - 1;
+  const setWeight = (set: SetId) => [1, 0.5, 0.15, 0.05, 0.02][topTier - tierOf(set)] ?? 0.02;
+  const def = r.weighted(pool.map((c) => [c, weights[c.rarity] * setWeight(c.set)] as [CardDef, number]));
   const needVariety = def.rarity !== 'C' && r.chance(0.25);
   // only ask for graded copies of cards worth grading
   const gradeable = C.RARITY_VALUE[def.rarity] >= C.RARITY_VALUE.R;
@@ -852,7 +877,14 @@ function shiftTimers(s: GameState, ms: number) {
 
 export function advance(s: GameState, now: number, active = true) {
   let dtMs = now - s.now;
-  if (dtMs < -5000) { shiftTimers(s, dtMs); return; } // device clock went backwards
+  if (dtMs < -5000) {
+    // Device clock went backwards: no time passes. Timers are not pulled back, so
+    // winding the clock forward and back again never gains anything.
+    s.now = now;
+    s.lastMarketTick = Math.min(s.lastMarketTick, now);
+    for (const l of s.listings) l.at = Math.min(l.at, now);
+    return;
+  }
   if (dtMs <= 0) return;
   const capped = Math.min(dtMs, C.OFFLINE_CAP_MS);
   // shift timers so offline time beyond the cap is skipped entirely

@@ -57,8 +57,8 @@ export const GRADE_DIST: [number, number][] = [
 export function gradeMult(g: number): number {
   if (g >= 10) return 5;
   if (g >= 9.5) return 2.5;
-  if (g >= 9) return 1.6;
-  if (g >= 8) return 1.1;
+  if (g >= 9) return 1.35;
+  if (g >= 8) return 0.95;
   if (g >= 7) return 0.85;
   return 0.6;
 }
@@ -67,7 +67,7 @@ export const MAX_ITEM_MULT = 100;
 export type GraderId = 'plat' | 'gold';
 export const GRADERS: Record<GraderId, { name: string; short: string; flat: number; pct: number; seconds: number; bonus: number; needs: SetId }> = {
   plat: { name: 'Platinum Grade', short: 'PG', flat: 3, pct: 0.04, seconds: 30, bonus: 1, needs: 'iron' },
-  gold: { name: 'Golden Spike Authority', short: 'GSA', flat: 25, pct: 0.1, seconds: 90, bonus: 1.3, needs: 'electric' },
+  gold: { name: 'Golden Spike Authority', short: 'GSA', flat: 25, pct: 0.1, seconds: 90, bonus: 1.1, needs: 'electric' },
 };
 
 export const DEALER_BASE = 0.55;
@@ -89,13 +89,13 @@ export const HYPE_REVERT = 0.08;
 export const HYPE_NOISE = 0.045;
 export const DEMAND_SELL = 0.04;
 export const DEMAND_BUY = 0.04;
-export const DEMAND_RECOVER = 0.01;
+export const DEMAND_RECOVER = 0.02;
 
 export const FREE_PACK_MS = 20 * 60_000;
 export const FREE_PACK_MAX = 3;
 export const OFFLINE_CAP_MS = 2 * 3600_000;
 
-export const DISPLAY_PCT_PER_HOUR = 0.02;
+export const DISPLAY_PCT_PER_HOUR = 0.06;
 export const DISPLAY_CAP_BY_SET: Record<SetId, number> = { iron: 20, diesel: 100, electric: 500, bullet: 2500, maglev: 12000 };
 
 export const REQUEST_COUNT = 3;
@@ -106,7 +106,7 @@ export type UpgradeId = 'haggle' | 'listings' | 'display' | 'loupe' | 'gradeSlot
 export const UPGRADES: Record<UpgradeId, { name: string; desc: (lvl: number) => string; costs: number[]; icon: string }> = {
   haggle: { name: 'Haggling', icon: '🤝', desc: (l) => `Dealer pays ${Math.round((DEALER_BASE + DEALER_PER_HAGGLE * l) * 100)}% of value`, costs: [400, 2000, 8000, 40000, 150000] },
   listings: { name: 'Listing Slots', icon: '🏷️', desc: (l) => `${3 + l} marketplace listings at once`, costs: [100, 600, 3000, 15000, 75000] },
-  display: { name: 'Display Case', icon: '🖼️', desc: (l) => `${2 + l} display slots`, costs: [200, 1200, 6000, 25000, 100000, 300000] },
+  display: { name: 'Display Case', icon: '🖼️', desc: (l) => `${2 + l} display slots`, costs: [200, 1200, 6000, 25000, 60000, 120000] },
   loupe: { name: 'Jeweler\'s Loupe', icon: '🔍', desc: (l) => ['Rough condition estimates', 'Better condition estimates', 'Sharp condition estimates', 'Near-perfect condition estimates'][l], costs: [300, 4000, 40000] },
   gradeSlots: { name: 'Grading Slots', icon: '📦', desc: (l) => `${2 + l} cards at the grader at once`, costs: [250, 2000, 12000, 60000] },
   autoBulk: { name: 'Auto-Bulk', icon: '🧹', desc: (l) => (l ? 'Standard commons are sold automatically after each rip' : 'Automatically sell Standard commons after each rip'), costs: [500] },

@@ -113,7 +113,7 @@ function Nav() {
 function Toasts() {
   const notices = useStore((s) => s.game.notices);
   const act = useStore((s) => s.act);
-  const opening = useStore((s) => s.opening);
+  const opening = useStore((s) => s.opening || s.revealing);
   const seen = useRef(new Set<number>());
   const [visible, setVisible] = useState<G.Notice[]>([]);
   useEffect(() => {

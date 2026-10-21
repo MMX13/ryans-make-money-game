@@ -12,7 +12,6 @@ export function Grading() {
   const push = useStore((s) => s.push);
   const now = useNow(250);
   const [reveal, setReveal] = useState<{ inst: G.CardInst; before: number } | null>(null);
-  const act = useStore((s) => s.act);
   const slots = G.gradingSlots(game);
   const rev = useStore((s) => s.rev);
   const candidates = useMemo(() => game.cards
@@ -25,8 +24,9 @@ export function Grading() {
   const crack = (uid: number) => {
     const inst0 = game.cards.find((c) => c.uid === uid)!;
     const before = G.value(game, { ...inst0, grade: undefined });
-    const inst = act((g) => G.crackSlab(g, uid));
-    if (inst) { sfx.slab(); buzz(15); setReveal({ inst, before }); }
+    sfx.slab(); buzz(15);
+    useStore.setState({ revealing: true });
+    setReveal({ inst: inst0, before });
   };
 
   return (
@@ -67,7 +67,7 @@ export function Grading() {
               <CardFace look={c} size="xs" />
               <span className="grow">
                 <b>{G.card(c).name}</b>
-                <small className={est[0] >= 9 ? 'pos' : est[1] < 8 ? 'neg' : 'muted'}>Est. {est[0]}–{est[1]}</small>
+                <small className={est[0] >= 9 ? 'pos' : est[1] < 8 ? 'neg' : 'muted'}>Likely {G.fmtEstimate(est)}</small>
               </span>
               <span className="right">
                 <Money v={v} />
@@ -77,20 +77,26 @@ export function Grading() {
           ))}
         </div>
       )}
-      {reveal && <SlabReveal inst={reveal.inst} before={reveal.before} onClose={() => setReveal(null)} />}
+      {reveal && <SlabReveal sealed={reveal.inst} before={reveal.before} onClose={() => { setReveal(null); useStore.setState({ revealing: false }); }} />}
     </div>
   );
 }
 
-function SlabReveal({ inst, before, onClose }: { inst: G.CardInst; before: number; onClose: () => void }) {
+function SlabReveal({ sealed, before, onClose }: { sealed: G.CardInst; before: number; onClose: () => void }) {
   const game = useStore((s) => s.game);
-  const [open, setOpen] = useState(false);
-  const after = G.value(game, inst);
-  const g = inst.grade!;
+  const act = useStore((s) => s.act);
+  const [graded, setGraded] = useState<G.CardInst | null>(null);
+  const open = !!graded;
+  const inst = graded ?? sealed;
+  const after = graded ? G.value(game, graded) : before;
+  const g = graded?.grade ?? 0;
   const tier = g >= 10 ? 'gem' : g >= 9 ? 'good' : g >= 8 ? 'ok' : 'bad';
   const reveal = () => {
     if (open) { onClose(); return; }
-    setOpen(true);
+    const res = act((s) => G.crackSlab(s, sealed.uid));
+    if (!res) { onClose(); return; }
+    setGraded(res);
+    const g = res.grade!;
     sfx.crack();
     buzz(g >= 9.5 ? [60, 40, 120] : 25);
     setTimeout(() => sfx.reveal(g >= 10 ? 'SEC' : g >= 9.5 ? 'UR' : g >= 9 ? 'SR' : g >= 8 ? 'R' : 'C'), 350);

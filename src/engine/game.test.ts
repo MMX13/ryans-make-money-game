@@ -125,11 +125,14 @@ describe('regressions from code review', () => {
     expect(s.cash).toBeLessThan(before);
   });
 
-  it('recovers when the device clock goes backwards', () => {
-    const s = G.newGame(1e12, 8);
-    G.advance(s, 1e12 - 3600_000);
-    expect(s.now).toBe(1e12 - 3600_000);
-    expect(s.nextFreeAt - s.now).toBeLessThanOrEqual(20 * 60_000);
+  it('gains nothing from winding the clock forward then back', () => {
+    const s = G.newGame(0, 8);
+    G.advance(s, 2 * 3600_000);
+    const free = s.freePacks;
+    G.advance(s, 0);
+    expect(s.now).toBe(0);
+    G.advance(s, 2 * 3600_000);
+    expect(s.freePacks).toBe(free);
   });
 
   it('rejects bad inputs without changing state', () => {

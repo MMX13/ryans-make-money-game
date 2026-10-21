@@ -1,25 +1,17 @@
 import { useState } from 'react';
 import { CARD_BY_ID, SET_BY_ID } from '../../engine/data';
-import { GRADERS, LISTING_FEE, RARITY_NAME, VARIETY_NAME, gradeMult, type GraderId } from '../../engine/config';
+import { GRADERS, LISTING_FEE, RARITY_NAME, VARIETY_NAME, type GraderId } from '../../engine/config';
 import * as G from '../../engine/game';
 import { CardFace, RARITY_COLOR, Tilt } from '../Card';
 import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
 import { Money, Sheet, fmtTime, useNow } from '../widgets';
 
-export function expectedGradeMult(lo: number, hi: number): number {
-  // rough average of the multiplier across the estimate range
-  const pts: number[] = [];
-  for (let g = lo; g <= hi + 1e-9; g += 0.5) pts.push(gradeMult(g));
-  return pts.reduce((a, b) => a + b, 0) / pts.length;
-}
-
 export function worthGrading(game: G.GameState, inst: G.CardInst): boolean {
   if (inst.grade !== undefined) return false;
-  const [lo, hi] = G.gradeEstimate(game, inst);
   const v = G.value(game, inst);
   const fee = G.gradingFee(game, inst, 'plat');
-  return expectedGradeMult(lo, hi) * v - fee > v * 1.15 && lo >= 8.5;
+  return G.expectedGradeMult(game, inst) * v - fee > v * 1.1 && v >= 1;
 }
 
 export function CardSheet({ uid }: { uid: number }) {
@@ -40,7 +32,8 @@ export function CardSheet({ uid }: { uid: number }) {
   const [lo, hi] = G.gradeEstimate(game, inst);
   const listing = game.listings.find((l) => l.uid === uid);
   const sub = game.grading.find((g) => g.uid === uid);
-  const matches = game.requests.filter((q) => G.requestMatches(q, inst));
+  // only suggest delivering when the request pays at least what this copy is worth
+  const matches = game.requests.filter((q) => G.requestMatches(q, inst) && q.pay >= G.value(game, inst) * 0.95);
   const freeSlot = game.display.findIndex((d) => d === null);
 
   const sell = () => {
@@ -56,7 +49,7 @@ export function CardSheet({ uid }: { uid: number }) {
         <div><small>Dealer pays</small><b><Money v={dealer} /></b></div>
         <div>
           <small>{inst.grade !== undefined ? 'Grade' : 'Est. grade'}</small>
-          <b>{inst.grade !== undefined ? `${GRADERS[inst.grader!].short} ${inst.grade}` : `${lo}–${hi}`}</b>
+          <b>{inst.grade !== undefined ? `${GRADERS[inst.grader!].short} ${inst.grade}` : G.fmtEstimate([lo, hi])}</b>
         </div>
       </div>
       <p className="cs-set muted">{SET_BY_ID[def.set].name} #{def.num} · {inst.first ? '1st Edition · ' : ''}{(game.demand[inst.cardId] ?? 1) < 0.97 ? 'Demand is soft (you sold copies recently)' : 'Pulled ' + new Date(inst.at).toLocaleDateString()}</p>
@@ -152,27 +145,39 @@ function ListPanel({ v, ratio, setRatio, slotsFree, onList, onBack }: { v: numbe
 function GradePanel({ inst, onBack, onDone }: { inst: G.CardInst; onBack: () => void; onDone: () => void; onGo: () => void }) {
   const game = useStore((s) => s.game);
   const act = useStore((s) => s.act);
-  const [lo, hi] = G.gradeEstimate(game, inst);
+  const odds = G.gradeOdds(game, inst);
   const v = G.value(game, inst);
+  const em = G.expectedGradeMult(game, inst);
   const slotsFree = G.gradingSlots(game) - game.grading.length;
+  const shown = odds.filter(([g]) => g >= 6).concat([[5.5, odds.filter(([g]) => g < 6).reduce((a, [, p]) => a + p, 0)]]);
   return (
     <div className="cs-panel">
-      <p className="muted small">Estimated condition <b>{lo}–{hi}</b>. A 10 is worth ×5, a 9 ×1.6, an 8 ×1.1, and a 7 or less is worth less than raw.</p>
+      <div className="odds-chart">
+        {shown.map(([g, p]) => (
+          <div key={g} className="odds-col">
+            <div className="odds-bar"><div style={{ height: `${Math.max(2, p * 100)}%` }} className={g >= 9 ? 'hi' : g >= 8 ? 'mid' : 'lo'} /></div>
+            <b>{g === 5.5 ? '≤5' : g}</b>
+            <small>{Math.round(p * 100)}%</small>
+          </div>
+        ))}
+      </div>
+      <p className="muted small center">Chance of each grade, based on what you can see{game.upgrades.loupe < 3 ? ' (a better Loupe sharpens this)' : ''}. Raw value <Money v={v} />.</p>
       {(Object.keys(GRADERS) as GraderId[]).map((id) => {
         const g = GRADERS[id];
         const unlocked = G.hasLicense(game, g.needs);
         const fee = G.gradingFee(game, inst, id);
-        const exp = expectedGradeMult(lo, hi) * g.bonus * v;
+        const exp = em * g.bonus * v;
+        const good = exp - fee > v;
         return (
           <div key={id} className={'grader-opt' + (unlocked ? '' : ' locked')}>
             <div>
               <b>{g.name}</b>
               <small>{g.seconds}s turnaround{g.bonus > 1 ? ` · slabs worth ×${g.bonus}` : ''}</small>
-              {unlocked ? <small>Expected slab value ≈ <Money v={exp} /></small> : <small>Needs the {SET_BY_ID[g.needs].name} license</small>}
+              {unlocked ? <small className={good ? 'pos' : 'neg'}>Average slab ≈ <Money v={exp} /> {good ? '· worth a shot' : '· likely a loss'}</small> : <small>Needs the {SET_BY_ID[g.needs].name} license</small>}
             </div>
             <button className="btn primary" disabled={!unlocked || slotsFree <= 0 || game.cash < fee}
               onClick={() => { if (act((s) => G.submitGrading(s, inst.uid, id))) { sfx.slab(); buzz(15); onDone(); } else sfx.error(); }}>
-              <Money v={fee} />
+              Pay <Money v={fee} />
             </button>
           </div>
         );

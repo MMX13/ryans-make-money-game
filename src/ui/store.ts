@@ -29,6 +29,8 @@ interface Store {
   sheets: Sheet[];
   /** Bumped whenever the card collection may have changed (for memoising expensive views). */
   rev: number;
+  /** A reveal (pack or slab) is on screen: hold back toasts so they don't spoil it. */
+  revealing: boolean;
   opening: Opening | null;
   binderSet: G.PackResult['set'];
   /** Apply a mutation to a copy of the game state. Returns whatever fn returns. */
@@ -122,6 +124,7 @@ export const useStore = create<Store>((set, get) => ({
   opening: null,
   binderSet: 'iron',
   rev: 0,
+  revealing: false,
   act: (fn) => {
     const copy = cloneGame(get().game);
     // bring the clock up to date first, so time-based progress is never skipped
