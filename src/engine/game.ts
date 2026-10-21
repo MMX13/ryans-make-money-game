@@ -290,7 +290,7 @@ const NEXT_RARITY: Partial<Record<Rarity, Rarity>> = { R: 'SR', SR: 'UR', UR: 'S
 
 export function hasLicense(s: GameState, set: SetId) { return s.licenses.includes(set); }
 
-export function openPack(s: GameState, set: SetId): PackResult | null {
+export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?: boolean; fake?: boolean }): PackResult | null {
   if (s.packs[set] <= 0) return null;
   s.packs[set]--;
   const first = s.opened[set] < C.FIRST_EDITION_PACKS;
@@ -298,7 +298,7 @@ export function openPack(s: GameState, set: SetId): PackResult | null {
   s.stats.packsOpened++;
   const result = withRng(s, (r) => {
     const rarities: Rarity[] = [];
-    const god = s.stats.packsOpened > 5 && r.chance(C.GOD_PACK);
+    const god = force?.god ?? (s.stats.packsOpened > 5 && r.chance(C.GOD_PACK));
     let fakeFrom: Rarity | null = null;
     if (god) {
       for (let i = 0; i < 5; i++) rarities.push(r.weighted<Rarity>([['SR', 0.8], ['UR', 0.17], ['SEC', 0.03]]));
@@ -308,7 +308,9 @@ export function openPack(s: GameState, set: SetId): PackResult | null {
       let hit = r.weighted(C.HIT_ODDS);
       if (s.pity[set] >= C.PITY_PACKS - 1 && (hit === 'R' || hit === 'SR')) hit = r.chance(0.82) ? 'UR' : 'SEC';
       if (s.stats.packsOpened === 3 && hit === 'R') hit = 'SR';
-      if (hit !== 'SEC' && r.chance(C.FAKEOUT)) { fakeFrom = hit; hit = NEXT_RARITY[hit]!; }
+      if (force?.hit) hit = force.hit;
+      if (force?.fake && hit !== 'R') { fakeFrom = hit === 'SR' ? 'R' : hit === 'UR' ? 'SR' : 'UR'; }
+      else if (!force && hit !== 'SEC' && r.chance(C.FAKEOUT)) { fakeFrom = hit; hit = NEXT_RARITY[hit]!; }
       rarities.push(hit);
     }
     const hasBig = rarities.some((x) => x === 'UR' || x === 'SEC');
@@ -719,12 +721,11 @@ export function checkAchievements(s: GameState) {
     }
   }
   const nw = netWorth(s);
+  let top = 0;
   for (const m of C.MILESTONES) {
-    if (nw >= m && !s.milestones.includes(m)) {
-      s.milestones.push(m);
-      notify(s, 'milestone', m >= 1_000_000 ? 'RAIL BARON! Net worth $1,000,000' : `Net worth passed ${fmtMoney(m)}!`);
-    }
+    if (nw >= m && !s.milestones.includes(m)) { s.milestones.push(m); top = m; }
   }
+  if (top) notify(s, 'milestone', top >= 1_000_000 ? 'RAIL BARON! Net worth $1,000,000' : `Net worth passed ${fmtMoney(top)}!`);
 }
 
 // ---------------------------------------------------------------- time

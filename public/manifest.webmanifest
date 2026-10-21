@@ -1,0 +1,17 @@
+{
+  "name": "Rail Riches",
+  "short_name": "Rail Riches",
+  "description": "Rip packs of train cards, hunt rare editions, grade your pulls and trade your way to a million.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#120f0d",
+  "theme_color": "#120f0d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

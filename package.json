@@ -6,10 +6,10 @@
   "description": "Rail Riches - a phone-first train card collecting and trading game.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc --noEmit -p .",
     "sim": "vite-node scripts/sim.ts"
   },
   "dependencies": {
