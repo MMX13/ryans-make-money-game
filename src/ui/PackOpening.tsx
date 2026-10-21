@@ -36,6 +36,8 @@ function SingleOpening() {
   const [burst, setBurst] = useState<Rarity | null>(null);
   const holdRef = useRef<{ raf: number; start: number } | null>(null);
   const justHeld = useRef(0);
+  const pressing = useRef(false);
+  const burstTimer = useRef<number | null>(null);
   const cards = result.cards;
   const cur = cards[idx];
   const curDef = cur ? CARD_BY_ID[cur.inst.cardId] : null;
@@ -73,6 +75,7 @@ function SingleOpening() {
   }, [phase, idx, flipped, cracked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function advance() {
+    if (burstTimer.current) { clearTimeout(burstTimer.current); burstTimer.current = null; }
     setFlipped(false);
     setCracked(false);
     setBurst(null);
@@ -90,7 +93,7 @@ function SingleOpening() {
     if (RANK[r] >= 2 || cur.inst.variety !== 'std') {
       const special = cur.inst.variety === 'gold' || cur.inst.variety === 'misprint';
       const fx: Rarity = special && RANK[r] < 4 ? 'UR' : RANK[r] >= 2 ? r : 'R';
-      setTimeout(() => {
+      burstTimer.current = window.setTimeout(() => {
         sfx.reveal(special ? fx : RANK[r] >= 2 ? r : 'U');
         setBurst(fx);
         buzz(RANK[r] >= 4 ? [60, 40, 90, 40, 140] : RANK[r] >= 3 ? [30, 30, 60] : 25);
@@ -101,7 +104,7 @@ function SingleOpening() {
   function tapCard() {
     if (phase !== 'reveal' || !cur) return;
     // the click that ends a press-and-hold is not a tap
-    if (justHeld.current) { justHeld.current = 0; return; }
+    if (performance.now() - justHeld.current < 400) return;
     if (flipped) { advance(); return; }
     if (result.fakeFrom && isHit && !cracked) {
       setCracked(true);
@@ -115,7 +118,7 @@ function SingleOpening() {
 
   const holdStart = () => {
     if (!needsHold || holdRef.current) return;
-    justHeld.current = 1;
+    pressing.current = true;
     sfx.chargeStart();
     const start = performance.now();
     const loop = () => {
@@ -133,13 +136,18 @@ function SingleOpening() {
     holdRef.current = { raf: requestAnimationFrame(loop), start };
   };
   const holdEnd = () => {
+    if (pressing.current) { pressing.current = false; justHeld.current = performance.now(); }
     if (!holdRef.current) return;
     cancelAnimationFrame(holdRef.current.raf);
     holdRef.current = null;
     sfx.chargeStop();
     setCharge(0);
   };
-  useEffect(() => () => { if (holdRef.current) cancelAnimationFrame(holdRef.current.raf); sfx.chargeStop(); }, []);
+  useEffect(() => () => {
+    if (holdRef.current) cancelAnimationFrame(holdRef.current.raf);
+    if (burstTimer.current) clearTimeout(burstTimer.current);
+    sfx.chargeStop();
+  }, []);
 
   const set = SET_BY_ID[result.set];
   const game = useStore((s) => s.game);

@@ -147,3 +147,37 @@ describe('regressions from code review', () => {
     expect(s.display[0]).toBe(s.cards[0].uid);
   });
 });
+
+describe('round 3 regressions', () => {
+  it('free packs open as free, bought packs carry their price', () => {
+    const s = G.newGame(0, 30);
+    G.buyPacks(s, 'iron', 1);
+    G.claimFreePack(s);
+    const a = G.openPack(s, 'iron')!;
+    const b = G.openPack(s, 'iron')!;
+    expect(a.paid).toBe(0);
+    expect(b.paid).toBe(5);
+  });
+
+  it('a clock correction never leaves timers stuck for long', () => {
+    const s = G.newGame(0, 31);
+    s.packs.iron = 1;
+    G.openPack(s, 'iron');
+    const day = 24 * 3600_000;
+    G.advance(s, day);
+    s.cash = 100;
+    G.submitGrading(s, s.cards[0].uid, 'plat');
+    G.advance(s, 0);
+    expect(s.grading[0].doneAt).toBeLessThanOrEqual(30_000);
+    expect(s.nextFreeAt).toBeLessThanOrEqual(20 * 60_000);
+  });
+
+  it('migrates the old tutorial step counter to a bitmask', () => {
+    const s = G.newGame(0, 32) as any;
+    delete s.tutorialBits;
+    s.tutorial = 5;
+    const m = G.migrate(JSON.parse(JSON.stringify(s)))!;
+    expect(m.tutorial).toBe(0b11111);
+    expect(m.freeHeld).toBeDefined();
+  });
+});

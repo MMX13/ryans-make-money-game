@@ -79,6 +79,10 @@ export interface GameState {
   demand: Record<string, number>;
   sealedDemand: Record<SetId, number>;
   packCost: Record<SetId, number>;
+  /** Unopened packs that were free (not part of the cost basis). */
+  freeHeld: Record<SetId, number>;
+  /** Set once `tutorial` holds a bitmask of finished tips. */
+  tutorialBits?: boolean;
   event: MarketEvent | null;
   nextEventAt: number;
   listings: Listing[];
@@ -123,6 +127,8 @@ export function newGame(now: number, seed = (Math.random() * 2 ** 32) >>> 0): Ga
     demand: {},
     sealedDemand: zeroBySet(1),
     packCost: zeroBySet(0),
+    freeHeld: zeroBySet(0),
+    tutorialBits: true,
     event: null,
     nextEventAt: now + 8 * 60_000,
     listings: [],
@@ -163,7 +169,7 @@ function withRng<T>(s: GameState, fn: (r: Rng) => T): T {
 
 export function notify(s: GameState, kind: NoticeKind, text: string, amount?: number) {
   s.notices.push({ id: s.nextId++, kind, text, amount });
-  if (s.notices.length > 12) s.notices.splice(0, s.notices.length - 12);
+  if (s.notices.length > 40) s.notices.splice(0, s.notices.length - 40);
 }
 
 // ---------------------------------------------------------------- values
@@ -338,8 +344,13 @@ export function hasLicense(s: GameState, set: SetId) { return s.licenses.include
 
 export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?: boolean; fake?: boolean }): PackResult | null {
   if (s.packs[set] <= 0) return null;
-  const paid = round2((s.packCost[set] ?? 0) / s.packs[set]);
-  s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) - paid));
+  // free packs are opened first and cost nothing; bought packs carry their average price
+  let paid = 0;
+  if ((s.freeHeld[set] ?? 0) > 0) s.freeHeld[set]--;
+  else {
+    paid = round2((s.packCost[set] ?? 0) / Math.max(1, s.packs[set] - (s.freeHeld[set] ?? 0)));
+    s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) - paid));
+  }
   s.packs[set]--;
   const first = s.opened[set] < C.FIRST_EDITION_PACKS;
   s.opened[set]++;
@@ -423,7 +434,11 @@ export function sellSealed(s: GameState, set: SetId, count: number): number {
     s.sealedDemand[set] = Math.max(0.5, (s.sealedDemand[set] ?? 1) * (1 - C.SEALED_PRESSURE));
   }
   amt = round2(amt);
-  s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) * (1 - n / s.packs[set])));
+  // sell free packs first, then reduce the cost basis of bought ones proportionally
+  const free = Math.min(n, s.freeHeld[set] ?? 0);
+  s.freeHeld[set] = (s.freeHeld[set] ?? 0) - free;
+  const boughtHeld = s.packs[set] - (s.freeHeld[set] + free);
+  if (n - free > 0 && boughtHeld > 0) s.packCost[set] = Math.max(0, round2((s.packCost[set] ?? 0) * (1 - (n - free) / boughtHeld)));
   s.packs[set] -= n;
   earn(s, amt, 'sealed');
   return amt;
@@ -734,7 +749,9 @@ export function claimFreePack(s: GameState): boolean {
   if (s.freePacks <= 0) return false;
   if (s.freePacks >= C.FREE_PACK_MAX) s.nextFreeAt = s.now + C.FREE_PACK_MS;
   s.freePacks--;
-  s.packs[freePackSet(s)]++;
+  const fs = freePackSet(s);
+  s.packs[fs]++;
+  s.freeHeld[fs] = (s.freeHeld[fs] ?? 0) + 1;
   return true;
 }
 
@@ -753,6 +770,7 @@ export function isBroke(s: GameState): boolean {
 export function claimCharity(s: GameState): boolean {
   if (!isBroke(s)) return false;
   s.packs.iron += 1;
+  s.freeHeld.iron = (s.freeHeld.iron ?? 0) + 1;
   notify(s, 'free', 'A kind shopkeeper slipped you a free pack');
   return true;
 }
@@ -883,6 +901,14 @@ export function advance(s: GameState, now: number, active = true) {
     s.now = now;
     s.lastMarketTick = Math.min(s.lastMarketTick, now);
     for (const l of s.listings) l.at = Math.min(l.at, now);
+    // ...but never leave a timer further away than its natural length
+    for (const g of s.grading) g.doneAt = Math.min(g.doneAt, now + C.GRADERS[g.grader].seconds * 1000);
+    s.nextFreeAt = Math.min(s.nextFreeAt, now + C.FREE_PACK_MS);
+    s.nextSinglesAt = Math.min(s.nextSinglesAt, now + C.SINGLES_ROTATE_MS);
+    s.nextEventAt = Math.min(s.nextEventAt, now + 6 * 60_000);
+    for (const q of s.requests) q.expiresAt = Math.min(q.expiresAt, now + 10 * 60_000);
+    if (s.event && s.event.startAt > now + 60_000) s.event = null;
+    else if (s.event) s.event.endAt = Math.min(s.event.endAt, now + 5 * 60_000);
     return;
   }
   if (dtMs <= 0) return;
@@ -985,5 +1011,11 @@ export function migrate(raw: any): GameState | null {
   const s = raw as GameState;
   s.sealedDemand ??= zeroBySet(1);
   s.packCost ??= zeroBySet(0);
+  s.freeHeld ??= zeroBySet(0);
+  if (!s.tutorialBits) {
+    // older saves stored the tutorial as a step counter
+    s.tutorial = s.tutorial >= 5 ? 0b11111 : (1 << s.tutorial) - 1;
+    s.tutorialBits = true;
+  }
   return s;
 }

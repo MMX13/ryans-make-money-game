@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { GRADERS, gradeMult } from '../../engine/config';
+import { useEffect, useMemo, useState } from 'react';
+import { GRADERS, gradeMult, type GraderId } from '../../engine/config';
 import * as G from '../../engine/game';
 import { CardBack, CardFace, Tilt, gradeLabel } from '../Card';
 import { worthGrading } from '../sheets/CardSheet';
@@ -11,7 +11,7 @@ export function Grading() {
   const game = useStore((s) => s.game);
   const push = useStore((s) => s.push);
   const now = useNow(250);
-  const [reveal, setReveal] = useState<{ inst: G.CardInst; before: number } | null>(null);
+  const [reveal, setReveal] = useState<{ inst: G.CardInst; before: number; grader: GraderId } | null>(null);
   const slots = G.gradingSlots(game);
   const rev = useStore((s) => s.rev);
   const candidates = useMemo(() => game.cards
@@ -25,8 +25,8 @@ export function Grading() {
     const inst0 = game.cards.find((c) => c.uid === uid)!;
     const before = G.value(game, { ...inst0, grade: undefined });
     sfx.slab(); buzz(15);
-    useStore.setState({ revealing: true });
-    setReveal({ inst: inst0, before });
+    const sub = game.grading.find((g) => g.uid === uid)!;
+    setReveal({ inst: inst0, before, grader: sub.grader });
   };
 
   return (
@@ -77,13 +77,17 @@ export function Grading() {
           ))}
         </div>
       )}
-      {reveal && <SlabReveal sealed={reveal.inst} before={reveal.before} onClose={() => { setReveal(null); useStore.setState({ revealing: false }); }} />}
+      {reveal && <SlabReveal sealed={reveal.inst} grader={reveal.grader} before={reveal.before} onClose={() => setReveal(null)} />}
     </div>
   );
 }
 
-function SlabReveal({ sealed, before, onClose }: { sealed: G.CardInst; before: number; onClose: () => void }) {
+function SlabReveal({ sealed, grader, before, onClose }: { sealed: G.CardInst; grader: GraderId; before: number; onClose: () => void }) {
   const game = useStore((s) => s.game);
+  useEffect(() => {
+    useStore.setState({ revealing: true });
+    return () => useStore.setState({ revealing: false });
+  }, []);
   const act = useStore((s) => s.act);
   const [graded, setGraded] = useState<G.CardInst | null>(null);
   const open = !!graded;
@@ -108,7 +112,7 @@ function SlabReveal({ sealed, before, onClose }: { sealed: G.CardInst; before: n
         <div className="slab-anim">
           {open ? <Tilt><CardFace look={inst} size="lg" /></Tilt> : (
             <div className="slab size-lg sealed-slab">
-              <div className="slab-label"><div className="slab-left"><b>{GRADERS[inst.grader!].short}</b><span>{G.card(inst).name}</span></div><div className="slab-grade"><small>GRADE</small><b>?</b></div></div>
+              <div className="slab-label"><div className="slab-left"><b>{GRADERS[grader].short}</b><span>{G.card(inst).name}</span></div><div className="slab-grade"><small>GRADE</small><b>?</b></div></div>
               <div className="slab-well"><CardFace look={{ ...inst, grade: undefined }} size="lg" /></div>
             </div>
           )}
