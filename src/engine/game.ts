@@ -77,6 +77,7 @@ export interface GameState {
   hype: Record<SetId, number>;
   hypeHist: Record<SetId, number[]>;
   demand: Record<string, number>;
+  sealedDemand: Record<SetId, number>;
   event: MarketEvent | null;
   nextEventAt: number;
   listings: Listing[];
@@ -119,6 +120,7 @@ export function newGame(now: number, seed = (Math.random() * 2 ** 32) >>> 0): Ga
     hype: zeroBySet(1),
     hypeHist: Object.fromEntries(ALL_SETS.map((id) => [id, [1]])) as Record<SetId, number[]>,
     demand: {},
+    sealedDemand: zeroBySet(1),
     event: null,
     nextEventAt: now + 4 * 60_000,
     listings: [],
@@ -209,8 +211,15 @@ export function boxPrice(s: GameState, set: SetId): number {
   return round2(packPrice(s, set) * C.BOX_SIZE * (1 - boxDiscount(s)));
 }
 
+/** Average of the recent hype history (sealed buyers are slow to react to spikes). */
+export function avgHype(s: GameState, set: SetId): number {
+  const h = s.hypeHist[set].slice(-10);
+  return h.reduce((a, b) => a + b, 0) / h.length;
+}
+
 export function sealedResale(s: GameState, set: SetId): number {
-  return round2(packPrice(s, set) * C.SEALED_RESALE);
+  const hype = Math.min(s.hype[set], avgHype(s, set));
+  return round2(SET_BY_ID[set].packPrice * hype * C.SEALED_RESALE * (s.sealedDemand[set] ?? 1));
 }
 
 export function netWorth(s: GameState): number {
@@ -355,7 +364,7 @@ export function openPack(s: GameState, set: SetId, force?: { hit?: Rarity; god?:
 }
 
 export function buyPacks(s: GameState, set: SetId, count: number, asBox = false): boolean {
-  if (!hasLicense(s, set)) return false;
+  if (!hasLicense(s, set) || !Number.isInteger(count) || count <= 0) return false;
   const cost = asBox ? boxPrice(s, set) : round2(packPrice(s, set) * count);
   const n = asBox ? C.BOX_SIZE : count;
   if (s.cash + 1e-9 < cost) return false;
@@ -365,9 +374,14 @@ export function buyPacks(s: GameState, set: SetId, count: number, asBox = false)
 }
 
 export function sellSealed(s: GameState, set: SetId, count: number): number {
-  const n = Math.min(count, s.packs[set]);
-  if (n <= 0) return 0;
-  const amt = round2(sealedResale(s, set) * n);
+  const n = Math.min(Math.floor(count), s.packs[set]);
+  if (!(n > 0)) return 0;
+  let amt = 0;
+  for (let i = 0; i < n; i++) {
+    amt += sealedResale(s, set);
+    s.sealedDemand[set] = Math.max(0.5, (s.sealedDemand[set] ?? 1) * (1 - C.SEALED_PRESSURE));
+  }
+  amt = round2(amt);
   s.packs[set] -= n;
   earn(s, amt, 'sealed');
   return amt;
@@ -418,42 +432,50 @@ function removeCard(s: GameState, uid: number) {
 /** Sells binder cards to the dealer. Returns cash received. */
 export function sellCards(s: GameState, insts: CardInst[], bulk = false): number {
   let total = 0;
+  const gone = new Set<number>();
   for (const inst of insts) {
-    if (inst.status !== 'binder') continue;
-    const p = dealerPrice(s, inst);
-    total += p;
+    if (inst.status !== 'binder' || gone.has(inst.uid)) continue;
+    total += dealerPrice(s, inst);
     pressure(s, inst.cardId, -C.DEMAND_SELL);
-    removeCard(s, inst.uid);
+    gone.add(inst.uid);
     if (bulk) s.stats.bulkSold++;
   }
+  if (gone.size) s.cards = s.cards.filter((c) => !gone.has(c.uid));
   total = round2(total);
   earn(s, total, bulk ? 'bulk' : 'dealer');
-  if (!bulk && insts.length) s.stats.sales += insts.length;
+  if (!bulk) s.stats.sales += gone.size;
   if (total > s.stats.biggestSale && insts.length === 1) s.stats.biggestSale = total;
   checkAchievements(s);
   return total;
 }
 
-/** Duplicate Standard, ungraded, non-favourite commons and uncommons (keeps one of each). */
+export function isBulkable(c: CardInst): boolean {
+  const r = card(c).rarity;
+  return (r === 'C' || r === 'U') && c.variety === 'std' && c.grade === undefined && !c.fav && !c.first && c.status === 'binder';
+}
+
+/**
+ * Duplicate Standard, ungraded, non-kept commons and uncommons. Always keeps at
+ * least one copy of each card (the oldest). `onlyUids` limits the result to those cards.
+ */
 export function bulkCandidates(s: GameState, onlyUids?: number[]): CardInst[] {
-  const keep = new Set<string>();
+  const copies = new Map<string, number>();
+  for (const c of s.cards) if (c.status === 'binder') copies.set(c.cardId, (copies.get(c.cardId) ?? 0) + 1);
+  const only = onlyUids ? new Set(onlyUids) : null;
   const out: CardInst[] = [];
-  const pool = s.cards
-    .filter((c) => c.status === 'binder')
-    .sort((a, b) => Number(b.fav ?? 0) - Number(a.fav ?? 0) || a.uid - b.uid);
-  for (const c of pool) {
-    const def = card(c);
-    const bulkable = (def.rarity === 'C' || def.rarity === 'U') && c.variety === 'std' && c.grade === undefined && !c.fav && !c.first;
-    if (!bulkable) { keep.add(c.cardId); continue; }
-    if (!keep.has(c.cardId)) { keep.add(c.cardId); continue; }
-    if (!onlyUids || onlyUids.includes(c.uid)) out.push(c);
+  for (let i = s.cards.length - 1; i >= 0; i--) {
+    const c = s.cards[i];
+    if (only && !only.has(c.uid)) continue;
+    if (!isBulkable(c)) continue;
+    const n = copies.get(c.cardId)!;
+    if (n > 1) { out.push(c); copies.set(c.cardId, n - 1); }
   }
   return out;
 }
 
 export function listCard(s: GameState, uid: number, price: number): boolean {
   const inst = s.cards.find((c) => c.uid === uid);
-  if (!inst || inst.status !== 'binder' || s.listings.length >= listingSlots(s)) return false;
+  if (!inst || inst.status !== 'binder' || s.listings.length >= listingSlots(s) || !Number.isFinite(price) || price <= 0) return false;
   inst.status = 'listed';
   s.listings.push({ uid, price: round2(Math.max(0.01, price)), at: s.now });
   return true;
@@ -511,17 +533,17 @@ export function crackSlab(s: GameState, uid: number): CardInst | null {
 
 export function setDisplay(s: GameState, slot: number, uid: number | null): boolean {
   if (slot < 0 || slot >= displaySlots(s)) return false;
+  const next = uid === null ? null : s.cards.find((c) => c.uid === uid);
+  if (uid !== null && (!next || next.status !== 'binder')) return false;
   const old = s.display[slot];
   if (old !== null && old !== undefined) {
     const o = s.cards.find((c) => c.uid === old);
     if (o) o.status = 'binder';
   }
   s.display[slot] = null;
-  if (uid !== null) {
-    const inst = s.cards.find((c) => c.uid === uid);
-    if (!inst || inst.status !== 'binder') return false;
-    inst.status = 'display';
-    s.display[slot] = uid;
+  if (next) {
+    next.status = 'display';
+    s.display[slot] = next.uid;
   }
   checkAchievements(s);
   return true;
@@ -747,6 +769,7 @@ function marketTick(s: GameState, r: Rng) {
     hist.push(s.hype[set]);
     if (hist.length > 40) hist.splice(0, hist.length - 40);
   }
+  for (const set of ALL_SETS) s.sealedDemand[set] = Math.min(1, (s.sealedDemand[set] ?? 1) + C.DEMAND_RECOVER * 2);
   for (const id of Object.keys(s.demand)) {
     const d = s.demand[id];
     const nd = d < 1 ? Math.min(1, d + C.DEMAND_RECOVER) : Math.max(1, d - C.DEMAND_RECOVER);
@@ -787,21 +810,27 @@ function scheduleEvent(s: GameState, r: Rng) {
  * grading timers, display income and free packs. Large gaps (offline time)
  * are capped.
  */
+/** Moves every timer by `ms` (used to skip capped offline time or undo a clock rollback). */
+function shiftTimers(s: GameState, ms: number) {
+  s.lastMarketTick += ms;
+  s.nextEventAt += ms;
+  s.nextSinglesAt += ms;
+  s.nextFreeAt += ms;
+  if (s.event) { s.event.startAt += ms; s.event.endAt += ms; }
+  for (const q of s.requests) q.expiresAt += ms;
+  for (const g of s.grading) g.doneAt += ms;
+  for (const l of s.listings) l.at += ms;
+  s.now += ms;
+}
+
 export function advance(s: GameState, now: number, active = true) {
   let dtMs = now - s.now;
+  if (dtMs < -5000) { shiftTimers(s, dtMs); return; } // device clock went backwards
   if (dtMs <= 0) return;
   const capped = Math.min(dtMs, C.OFFLINE_CAP_MS);
   // shift timers so offline time beyond the cap is skipped entirely
   if (dtMs > capped) {
-    const skip = dtMs - capped;
-    s.lastMarketTick += skip;
-    s.nextEventAt += skip;
-    s.nextSinglesAt += skip;
-    s.nextFreeAt += skip;
-    if (s.event) { s.event.startAt += skip; s.event.endAt += skip; }
-    for (const q of s.requests) q.expiresAt += skip;
-    for (const g of s.grading) g.doneAt += skip;
-    s.now += skip;
+    shiftTimers(s, dtMs - capped);
     dtMs = capped;
   }
   if (active) s.stats.playMs += Math.min(dtMs, 5000);
@@ -893,6 +922,8 @@ export function fmtMoney(n: number, compact = false): string {
 }
 
 export function migrate(raw: any): GameState | null {
-  if (!raw || typeof raw !== 'object' || raw.version !== SAVE_VERSION) return null;
-  return raw as GameState;
+  if (!raw || typeof raw !== 'object' || raw.version !== SAVE_VERSION || !Array.isArray(raw.cards)) return null;
+  const s = raw as GameState;
+  s.sealedDemand ??= zeroBySet(1);
+  return s;
 }

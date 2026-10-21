@@ -13,7 +13,7 @@ function ac(): AudioContext | null {
       master.gain.value = 0.5;
       master.connect(ctx.destination);
     }
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (ctx.state !== 'running') void ctx.resume();
     return ctx;
   } catch {
     return null;

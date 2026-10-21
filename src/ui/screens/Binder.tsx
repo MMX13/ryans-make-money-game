@@ -19,8 +19,11 @@ export function Binder() {
   const setBinderSet = useStore((s) => s.setBinderSet);
   const [view, setView] = useState<View>('set');
   const [filter, setFilter] = useState<Filter>('all');
-  const bulk = G.bulkCandidates(game);
-  const bulkValue = bulk.reduce((a, c) => a + G.dealerPrice(game, c), 0);
+  const rev = useStore((s) => s.rev);
+  const { bulk, bulkValue } = useMemo(() => {
+    const bulk = G.bulkCandidates(game);
+    return { bulk, bulkValue: bulk.reduce((a, c) => a + G.dealerPrice(game, c), 0) };
+  }, [rev, game.lastMarketTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="screen binder">
@@ -47,6 +50,7 @@ function SetView({ setId, onSet }: { setId: G.PackResult['set']; onSet: (s: G.Pa
   const prog = G.setProgress(game, setId);
   const cards = CARDS_BY_SET[setId];
   const claimed = game.bounties.includes(setId);
+  const rev = useStore((s) => s.rev);
   const bestByCard = useMemo(() => {
     const m = new Map<string, { inst: G.CardInst; n: number; v: number }>();
     for (const c of game.cards) {
@@ -56,7 +60,7 @@ function SetView({ setId, onSet }: { setId: G.PackResult['set']; onSet: (s: G.Pa
       else { e.n++; if (v > e.v) { e.inst = c; e.v = v; } }
     }
     return m;
-  }, [game]);
+  }, [rev, game.lastMarketTick]); // eslint-disable-line react-hooks/exhaustive-deps
   const visibleSets = SETS.filter((s) => game.licenses.includes(s.id) || game.cards.some((c) => G.card(c).set === s.id));
   return (
     <>
@@ -113,6 +117,7 @@ const RANK: Record<Rarity, number> = { C: 0, U: 1, R: 2, SR: 3, UR: 4, SEC: 5 };
 function AllView({ filter, setFilter }: { filter: Filter; setFilter: (f: Filter) => void }) {
   const game = useStore((s) => s.game);
   const push = useStore((s) => s.push);
+  const rev = useStore((s) => s.rev);
   const list = useMemo(() => {
     let cs = game.cards;
     if (filter === 'hits') cs = cs.filter((c) => RANK[G.card(c).rarity] >= 2);
@@ -120,8 +125,8 @@ function AllView({ filter, setFilter }: { filter: Filter; setFilter: (f: Filter)
     if (filter === 'special') cs = cs.filter((c) => c.variety !== 'std' || c.first);
     if (filter === 'grade') cs = cs.filter((c) => c.status === 'binder' && worthGrading(game, c));
     return cs.map((c) => ({ c, v: G.value(game, c) })).sort((a, b) => b.v - a.v).slice(0, 200);
-  }, [game, filter]);
-  const total = game.cards.reduce((a, c) => a + G.value(game, c), 0);
+  }, [rev, game.lastMarketTick, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  const total = useMemo(() => game.cards.reduce((a, c) => a + G.value(game, c), 0), [rev, game.lastMarketTick]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <div className="chips">

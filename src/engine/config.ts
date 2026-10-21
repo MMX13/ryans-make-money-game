@@ -74,7 +74,9 @@ export const LISTING_FEE = 0.08;
 export const LISTING_BASE_SECONDS = 22;
 export const LISTING_STEEPNESS = 6;
 export const SINGLES_MARKUP = 1.05;
-export const SEALED_RESALE = 0.85;
+/** Must stay below the cheapest box price per pack (80% during a Dealer Sale). */
+export const SEALED_RESALE = 0.75;
+export const SEALED_PRESSURE = 0.03;
 export const BOX_SIZE = 12;
 export const BOX_DISCOUNT = 0.08;
 

@@ -36,7 +36,6 @@ function SingleOpening() {
   const [burst, setBurst] = useState<Rarity | null>(null);
   const holdRef = useRef<{ raf: number; start: number } | null>(null);
   const justHeld = useRef(0);
-  const autoRef = useRef<number | null>(null);
   const cards = result.cards;
   const cur = cards[idx];
   const curDef = cur ? CARD_BY_ID[cur.inst.cardId] : null;
@@ -57,17 +56,17 @@ function SingleOpening() {
     setTimeout(() => setPhase('reveal'), reduced ? 150 : 650);
   };
 
-  // auto-fan plain commons at the start of the reveal
+  // auto-fan plain commons at the start of the reveal: flip, pause, move on
+  const autoCard = phase === 'reveal' && idx < 3 && !!cur && !isSpecial(cur) && !result.god;
   useEffect(() => {
-    if (phase !== 'reveal' || flipped) return;
-    if (idx < 3 && cur && !isSpecial(cur) && !result.god) {
-      autoRef.current = window.setTimeout(() => {
-        sfx.flip();
-        setFlipped(true);
-        autoRef.current = window.setTimeout(() => advance(), reduced ? 120 : 380);
-      }, idx === 0 ? 250 : 120);
-      return () => { if (autoRef.current) clearTimeout(autoRef.current); };
-    }
+    if (!autoCard) return;
+    const t = window.setTimeout(() => {
+      if (!flipped) { sfx.flip(); setFlipped(true); } else advance();
+    }, !flipped ? (idx === 0 ? 250 : 110) : (reduced ? 120 : 380));
+    return () => clearTimeout(t);
+  }, [autoCard, idx, flipped]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (phase !== 'reveal' || flipped || autoCard) return;
     if (glowRarity && RANK[glowRarity] >= 2) { sfx.glow(glowRarity); buzz(RANK[glowRarity] >= 4 ? [20, 40, 20] : 15); }
   }, [phase, idx, flipped, cracked]); // eslint-disable-line react-hooks/exhaustive-deps
 

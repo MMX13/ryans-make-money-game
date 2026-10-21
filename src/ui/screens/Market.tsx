@@ -7,6 +7,11 @@ import { buzz, sfx } from '../sfx';
 import { useStore } from '../store';
 import { Empty, Money, Progress, Sparkline, TrendArrow, fmtTime, useNow } from '../widgets';
 
+/** The cheapest matching copy that the player hasn't marked to keep. */
+export function bestMatch(game: G.GameState, q: G.Request): G.CardInst | undefined {
+  return game.cards.filter((c) => !c.fav && G.requestMatches(q, c)).sort((a, b) => G.value(game, a) - G.value(game, b))[0];
+}
+
 export function Market() {
   const game = useStore((s) => s.game);
   const act = useStore((s) => s.act);
@@ -37,7 +42,7 @@ export function Market() {
       <div className="requests">
         {game.requests.map((q) => {
           const def = CARD_BY_ID[q.cardId];
-          const match = game.cards.find((c) => G.requestMatches(q, c));
+          const match = bestMatch(game, q);
           const owned = game.cards.some((c) => c.cardId === q.cardId);
           return (
             <div key={q.id} className="request">

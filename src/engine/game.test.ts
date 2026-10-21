@@ -99,3 +99,48 @@ describe('economy', () => {
     expect(G.netWorth(s)).toBeCloseTo(expected, 1);
   });
 });
+
+describe('regressions from code review', () => {
+  it('sells listings and pays display income with 1-second ticks', () => {
+    const s = G.newGame(0, 21);
+    s.packs.iron = 2;
+    G.openPack(s, 'iron'); G.openPack(s, 'iron');
+    const [a, b] = s.cards;
+    G.listCard(s, a.uid, G.value(s, a));
+    G.setDisplay(s, 0, b.uid);
+    const cash0 = s.cash;
+    for (let t = 1; t <= 600; t++) G.advance(s, t * 1000);
+    expect(s.listings).toHaveLength(0);
+    expect(s.cash).toBeGreaterThan(cash0);
+    expect(s.stats.displayEarned).toBeGreaterThan(0);
+  });
+
+  it('never lets a sale box be resold sealed for a profit', () => {
+    const s = G.newGame(0, 4);
+    s.cash = 10000;
+    s.event = { kind: 'sale', startAt: 0, endAt: 1e9 };
+    const before = s.cash;
+    G.buyPacks(s, 'iron', 12, true);
+    G.sellSealed(s, 'iron', 12);
+    expect(s.cash).toBeLessThan(before);
+  });
+
+  it('recovers when the device clock goes backwards', () => {
+    const s = G.newGame(1e12, 8);
+    G.advance(s, 1e12 - 3600_000);
+    expect(s.now).toBe(1e12 - 3600_000);
+    expect(s.nextFreeAt - s.now).toBeLessThanOrEqual(20 * 60_000);
+  });
+
+  it('rejects bad inputs without changing state', () => {
+    const s = G.newGame(0, 9);
+    expect(G.buyPacks(s, 'iron', -5)).toBe(false);
+    expect(s.cash).toBe(20);
+    s.packs.iron = 1;
+    G.openPack(s, 'iron');
+    expect(G.listCard(s, s.cards[0].uid, NaN)).toBe(false);
+    G.setDisplay(s, 0, s.cards[0].uid);
+    expect(G.setDisplay(s, 0, 99999)).toBe(false);
+    expect(s.display[0]).toBe(s.cards[0].uid);
+  });
+});

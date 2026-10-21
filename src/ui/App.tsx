@@ -36,7 +36,7 @@ export function App() {
       <Coach />
       <Nav />
       <Toasts />
-      {sheets.map((s, i) => <SheetView key={i} sheet={s} />)}
+      {sheets.map((s, i) => <SheetView key={(s as any)?._k ?? i} sheet={s} />)}
       {opening && <PackOpening />}
     </div>
   );
@@ -147,6 +147,9 @@ function Coach() {
   const tab = useStore((s) => s.tab);
   const act = useStore((s) => s.act);
   const setTab = useStore((s) => s.setTab);
+  useEffect(() => {
+    if (game.tutorial <= 1 && game.stats.packsOpened > 0) act((g) => { g.tutorial = Math.max(g.tutorial, 2); });
+  }, [game.tutorial, game.stats.packsOpened]); // eslint-disable-line react-hooks/exhaustive-deps
   if (game.tutorial >= 5) return null;
   const packs = SETS.reduce((a, s) => a + game.packs[s.id], 0);
   let msg: string | null = null;
@@ -161,10 +164,7 @@ function Coach() {
   else if (step === 2) { msg = 'Nice pulls! Hits sell best on the marketplace: open a card in your Binder and list it.'; go = tab === 'binder' ? null : 'binder'; }
   else if (step === 3) { msg = 'Check the Market for collector requests and price trends. Grade cards with high condition estimates.'; go = tab === 'market' ? null : 'market'; }
   else if (step === 4) { msg = 'Grow your net worth to $1,000,000. New licenses in the Shop unlock bigger sets. Good luck!'; }
-  if (!msg) {
-    if (step === 1 && game.stats.packsOpened > 0) act((g) => { g.tutorial = 2; });
-    return null;
-  }
+  if (!msg) return null;
   const next = () => act((g) => { g.tutorial = Math.max(step, g.tutorial) + 1; });
   return (
     <div className="coach">

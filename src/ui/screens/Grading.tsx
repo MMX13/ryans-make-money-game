@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { GRADERS, gradeMult } from '../../engine/config';
 import * as G from '../../engine/game';
 import { CardBack, CardFace, Tilt, gradeLabel } from '../Card';
@@ -14,12 +14,13 @@ export function Grading() {
   const [reveal, setReveal] = useState<{ inst: G.CardInst; before: number } | null>(null);
   const act = useStore((s) => s.act);
   const slots = G.gradingSlots(game);
-  const candidates = game.cards
+  const rev = useStore((s) => s.rev);
+  const candidates = useMemo(() => game.cards
     .filter((c) => c.status === 'binder' && c.grade === undefined)
     .map((c) => ({ c, v: G.value(game, c), est: G.gradeEstimate(game, c), worth: worthGrading(game, c) }))
     .filter((x) => x.v >= 1)
     .sort((a, b) => Number(b.worth) - Number(a.worth) || b.v - a.v)
-    .slice(0, 40);
+    .slice(0, 40), [rev, game.lastMarketTick, game.upgrades.loupe]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const crack = (uid: number) => {
     const inst0 = game.cards.find((c) => c.uid === uid)!;

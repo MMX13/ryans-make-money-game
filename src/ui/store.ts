@@ -27,6 +27,8 @@ interface Store {
   game: G.GameState;
   tab: Tab;
   sheets: Sheet[];
+  /** Bumped whenever the card collection may have changed (for memoising expensive views). */
+  rev: number;
   opening: Opening | null;
   binderSet: G.PackResult['set'];
   /** Apply a mutation to a copy of the game state. Returns whatever fn returns. */
@@ -66,8 +68,13 @@ function load(): { game: G.GameState; away: string[] | null } {
       }
     }
   } catch {
-    /* corrupted save: start fresh */
+    /* unreadable save: handled below */
   }
+  // Never silently overwrite a save we could not read: keep a backup copy.
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) localStorage.setItem(`${SAVE_KEY}-backup-${now}`, raw);
+  } catch { /* storage blocked */ }
   return { game: G.newGame(now), away: null };
 }
 
@@ -79,15 +86,32 @@ function cloneGame(g: G.GameState): G.GameState {
   return copy;
 }
 
+/** Cheaper copy for the 1s tick: `advance` never mutates card objects, only the array. */
+function cloneForTick(g: G.GameState): G.GameState {
+  const { cards, ...rest } = g;
+  const copy = structuredClone(rest) as G.GameState;
+  copy.cards = cards.slice();
+  return copy;
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveWarned = false;
 export function saveNow(game: G.GameState) {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(game)); } catch { /* storage full or blocked */ }
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+    saveWarned = false;
+  } catch {
+    if (!saveWarned) {
+      saveWarned = true;
+      useStore.getState().act((g) => G.notify(g, 'info', 'Could not save! Storage is full: bulk-sell some cards.'));
+    }
+  }
 }
-function scheduleSave(game: G.GameState) {
+function scheduleSave() {
   if (saveTimer) return;
-  saveTimer = setTimeout(() => { saveTimer = null; saveNow(useStore.getState().game); }, 1500);
-  void game;
+  saveTimer = setTimeout(() => { saveTimer = null; saveNow(useStore.getState().game); }, 5000);
 }
+let sheetKey = 0;
 
 const initial = load();
 
@@ -97,16 +121,18 @@ export const useStore = create<Store>((set, get) => ({
   sheets: initial.away ? [{ kind: 'away', lines: initial.away }] : [],
   opening: null,
   binderSet: 'iron',
+  rev: 0,
   act: (fn) => {
     const copy = cloneGame(get().game);
-    copy.now = Math.max(copy.now, Date.now() - 1);
+    // bring the clock up to date first, so time-based progress is never skipped
+    G.advance(copy, Date.now(), document.visibilityState === 'visible');
     const out = fn(copy);
-    set({ game: copy });
-    scheduleSave(copy);
+    set({ game: copy, rev: get().rev + 1 });
+    scheduleSave();
     return out;
   },
   setTab: (tab) => set({ tab, sheets: [] }),
-  push: (sheet) => set({ sheets: [...get().sheets, sheet] }),
+  push: (sheet) => set({ sheets: [...get().sheets, { ...sheet!, _k: ++sheetKey } as unknown as Sheet] }),
   pop: () => set({ sheets: get().sheets.slice(0, -1) }),
   closeAll: () => set({ sheets: [] }),
   setOpening: (opening) => set({ opening }),
@@ -120,7 +146,11 @@ export const useStore = create<Store>((set, get) => ({
 export function startLoop() {
   const tick = () => {
     const st = useStore.getState();
-    st.act((g) => G.advance(g, Date.now(), document.visibilityState === 'visible'));
+    const copy = cloneForTick(st.game);
+    const n = copy.cards.length;
+    G.advance(copy, Date.now(), document.visibilityState === 'visible');
+    useStore.setState({ game: copy, rev: copy.cards.length !== n ? st.rev + 1 : st.rev });
+    scheduleSave();
   };
   const id = setInterval(tick, 1000);
   const onHide = () => { if (document.visibilityState === 'hidden') saveNow(useStore.getState().game); };
