@@ -230,7 +230,7 @@ export function HelpSheet() {
         <h4>Good to know</h4>
         <ul>
           <li>Selling lots of copies of one card softens its price for a while.</li>
-          <li>Net worth counts your cards at dealer price.</li>
+          <li>Net worth counts your cards at 80% of market value.</li>
           <li>An Ultra Rare or better is guaranteed within {C.PITY_PACKS} packs of each set.</li>
         </ul>
       </div>

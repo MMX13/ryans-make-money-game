@@ -73,6 +73,8 @@ export const GRADERS: Record<GraderId, { name: string; short: string; flat: numb
 export const DEALER_BASE = 0.55;
 export const DEALER_PER_HAGGLE = 0.04;
 export const LISTING_FEE = 0.08;
+/** Net worth counts cards at this share of market value (about what listing nets after fees and waiting). */
+export const NET_WORTH_CARD_RATE = 0.8;
 export const LISTING_BASE_SECONDS = 22;
 export const LISTING_STEEPNESS = 6;
 export const SINGLES_MARKUP = 1.05;

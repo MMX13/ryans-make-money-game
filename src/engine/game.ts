@@ -233,7 +233,7 @@ export function sealedResale(s: GameState, set: SetId): number {
 
 export function netWorth(s: GameState): number {
   let w = s.cash;
-  for (const c of s.cards) w += dealerPrice(s, c);
+  for (const c of s.cards) w += Math.max(dealerPrice(s, c), value(s, c) * C.NET_WORTH_CARD_RATE);
   for (const set of ALL_SETS) w += s.packs[set] * sealedResale(s, set);
   return round2(w);
 }

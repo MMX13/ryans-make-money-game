@@ -91,11 +91,11 @@ describe('economy', () => {
     expect(G.netWorth(copy)).toBe(G.netWorth(s));
   });
 
-  it('net worth values cards at dealer price', () => {
+  it('net worth values cards at 80% of market', () => {
     const s = G.newGame(0, 2);
     s.packs.iron = 1;
     G.openPack(s, 'iron');
-    const expected = s.cash + s.cards.reduce((a, c) => a + G.dealerPrice(s, c), 0) + s.packs.iron * G.sealedResale(s, 'iron');
+    const expected = s.cash + s.cards.reduce((a, c) => a + Math.max(G.dealerPrice(s, c), G.value(s, c) * 0.8), 0) + s.packs.iron * G.sealedResale(s, 'iron');
     expect(G.netWorth(s)).toBeCloseTo(expected, 1);
   });
 });
